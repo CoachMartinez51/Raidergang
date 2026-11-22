@@ -1,5 +1,5 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import type { Checkin, Goal, GoalKind, Group, Membership, Person, PersonDraft } from './types';
+import type { Category, Checkin, Drill, DrillDraft, Exercise, ExerciseDraft, Goal, GoalKind, Group, Membership, Person, PersonDraft } from './types';
 import { demoApi } from './demo';
 
 export interface Api {
@@ -28,7 +28,15 @@ export interface Api {
   saveCheckin(c: Pick<Checkin, 'person_id' | 'checkin_date' | 'bodyweight' | 'readiness' | 'note'>): Promise<Checkin>;
   checkinsOn(day: string): Promise<Checkin[]>;
   checkinHistory(personId: string, days: number): Promise<Checkin[]>;
+
+  listCategories(): Promise<Category[]>;
+  listExercises(): Promise<Exercise[]>;
+  saveExercise(id: string | null, e: ExerciseDraft): Promise<Exercise>;
+  listDrills(): Promise<Drill[]>;
+  saveDrill(id: string | null, d: DrillDraft): Promise<Drill>;
 }
+
+const cleanName = (msg: string) => /duplicate|unique/i.test(msg) ? 'Something with that name is already in the library.' : msg;
 
 const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
@@ -108,6 +116,26 @@ function liveApi(sb: SupabaseClient): Api {
       const since = new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
       return must(await sb.from('current_checkins').select('*').eq('person_id', personId)
         .gte('checkin_date', since).order('checkin_date', { ascending: false })) as Checkin[];
+    },
+
+    async listCategories() {
+      return must(await sb.from('exercise_categories').select('*').order('sort_order')) as Category[];
+    },
+    async listExercises() {
+      return must(await sb.from('exercises').select('*').order('name').range(0, 4999)) as Exercise[];
+    },
+    async saveExercise(id, e) {
+      const r = id ? await sb.from('exercises').update(e).eq('id', id).select().single() : await sb.from('exercises').insert(e).select().single();
+      if (r.error) throw new Error(cleanName(r.error.message));
+      return r.data as Exercise;
+    },
+    async listDrills() {
+      return must(await sb.from('throwing_drills').select('*').order('name')) as Drill[];
+    },
+    async saveDrill(id, d) {
+      const r = id ? await sb.from('throwing_drills').update(d).eq('id', id).select().single() : await sb.from('throwing_drills').insert(d).select().single();
+      if (r.error) throw new Error(cleanName(r.error.message));
+      return r.data as Drill;
     },
   };
 }

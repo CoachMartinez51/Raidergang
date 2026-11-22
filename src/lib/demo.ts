@@ -1,14 +1,15 @@
 // Demo mode: runs entirely in the browser with sample data, used until the
 // app is connected to Supabase. Nothing here leaves the device.
 import type { Api } from './api';
-import type { Checkin, Goal, Group, Membership, Person } from './types';
+import type { Category, Checkin, Drill, Exercise, Goal, Group, Membership, Person } from './types';
 import { addDays, isoDay } from './dates';
 
 const KEY = 'raidergang-demo-v1';
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2));
 const now = () => new Date().toISOString();
 
-interface Db { people: Person[]; groups: Group[]; members: Membership[]; goals: Goal[]; checkins: Checkin[]; session: string | null; }
+interface Db { people: Person[]; groups: Group[]; members: Membership[]; goals: Goal[]; checkins: Checkin[]; session: string | null;
+  categories?: Category[]; exercises?: Exercise[]; drills?: Drill[]; }
 
 const base = (p: Partial<Person> & Pick<Person, 'email' | 'first_name' | 'last_name'>): Person => ({
   id: uid(), aliases: [], trackman_pitcher_id: null, is_pitcher: false, is_position_player: false,
@@ -47,6 +48,22 @@ function save(d: Db) { try { localStorage.setItem(KEY, JSON.stringify(d)); } cat
 
 const listeners = new Set<() => void>();
 const emit = () => listeners.forEach(l => l());
+
+async function withLibrary(): Promise<Db> {
+  const d = load();
+  if (!d.exercises) {
+    const lib = (await import('./demoLibrary.json')).default as {
+      categories: Category[];
+      exercises: Omit<Exercise, 'id' | 'old_names' | 'active'>[];
+      drills: Omit<Drill, 'id' | 'old_names' | 'active'>[];
+    };
+    d.categories = lib.categories;
+    d.exercises = lib.exercises.map(e => ({ ...e, id: uid(), old_names: [], active: true }));
+    d.drills = lib.drills.map(x => ({ ...x, id: uid(), old_names: [], active: true }));
+    save(d);
+  }
+  return d;
+}
 
 export function demoApi(): Api & { signInAs(email: string): void; demoAccounts(): Person[]; reset(): void } {
   const currentOf = (rows: Checkin[]) => {
@@ -102,6 +119,23 @@ export function demoApi(): Api & { signInAs(email: string): void; demoAccounts()
     async checkinHistory(personId, days) {
       const since = addDays(isoDay(), -days);
       return currentOf(load().checkins).filter(c => c.person_id === personId && c.checkin_date >= since).sort((a, b) => b.checkin_date.localeCompare(a.checkin_date));
+    },
+    async listCategories() { return (await withLibrary()).categories!; },
+    async listExercises() { return [...(await withLibrary()).exercises!].sort((a, b) => a.name.localeCompare(b.name)); },
+    async saveExercise(id, e) {
+      const d = await withLibrary(); const list = d.exercises!;
+      if (list.some(x => x.id !== id && x.name.toLowerCase() === e.name.toLowerCase())) throw new Error('Something with that name is already in the library.');
+      let row = list.find(x => x.id === id);
+      if (row) Object.assign(row, e); else { row = { ...e, id: uid() }; list.push(row); }
+      save(d); return row;
+    },
+    async listDrills() { return [...(await withLibrary()).drills!].sort((a, b) => a.name.localeCompare(b.name)); },
+    async saveDrill(id, dr) {
+      const d = await withLibrary(); const list = d.drills!;
+      if (list.some(x => x.id !== id && x.name.toLowerCase() === dr.name.toLowerCase())) throw new Error('Something with that name is already in the library.');
+      let row = list.find(x => x.id === id);
+      if (row) Object.assign(row, dr); else { row = { ...dr, id: uid() }; list.push(row); }
+      save(d); return row;
     },
   };
 }

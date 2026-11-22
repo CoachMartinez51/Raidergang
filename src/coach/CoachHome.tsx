@@ -5,8 +5,9 @@ import { RPE_FLAG_AT } from '../lib/rpe';
 import { fullName, roleLabels, type Checkin, type Group, type Membership, type Person } from '../lib/types';
 import { ErrorMsg, RpeBadge, TopBar } from '../ui/common';
 import { PersonEditor } from './PersonEditor';
+import { Library } from './Library';
 
-type Tab = 'checkins' | 'roster';
+type Tab = 'checkins' | 'roster' | 'library';
 
 export interface RosterData { people: Person[]; groups: Group[]; members: Membership[]; }
 
@@ -32,10 +33,11 @@ export function CoachHome({ me }: { me: Person }) {
       <div className="tabs">
         <button className={`tab ${tab === 'checkins' ? 'on' : ''}`} onClick={() => setTab('checkins')}>Check-ins</button>
         <button className={`tab ${tab === 'roster' ? 'on' : ''}`} onClick={() => setTab('roster')}>Roster</button>
+        <button className={`tab ${tab === 'library' ? 'on' : ''}`} onClick={() => setTab('library')}>Library</button>
       </div>
       <div className="content">
         <ErrorMsg error={error} />
-        {!data ? <div className="muted small">Loading…</div> : tab === 'checkins'
+        {tab === 'library' ? <Library me={me} /> : !data ? <div className="muted small">Loading…</div> : tab === 'checkins'
           ? <CheckinBoard data={data} onOpen={p => setEditing(p)} />
           : <Roster me={me} data={data} onOpen={p => setEditing(p)} onAdd={() => setEditing('new')} />}
       </div>

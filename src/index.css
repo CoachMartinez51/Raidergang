@@ -77,3 +77,7 @@ select.input { appearance: none; }
 .muted { color: var(--muted); }
 .small { font-size: 13px; }
 .scroll-x { overflow-x: auto; }
+.lib-row { padding: 10px 8px; border-bottom: 1px solid var(--line); cursor: pointer; }
+.lib-row:last-child { border-bottom: none; }
+.lib-row:hover { background: #20241E; }
+select.input option { background: var(--card); }

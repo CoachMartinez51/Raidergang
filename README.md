@@ -34,7 +34,7 @@ Rules the schema enforces:
 ## Build stages
 
 1. ✅ Login, roster, daily check-in, objectives, coach check-in board
-2. Exercise + throwing drill libraries (import from Coaching Database)
+2. ✅ Exercise + throwing drill libraries (388 exercises, 60 drills) with coach Library screen
 3. Lift blocks: builder, assignments, set logging
 4. The Goods, Lift Prep, throwing calendar
 5. Trackman + video (version 2)

@@ -59,3 +59,32 @@ export const roleLabels = (p: Person): string[] => {
   if (p.is_coach) r.push(p.is_admin ? 'Admin' : p.coach_can_edit ? 'Coach' : 'Coach (view only)');
   return r;
 };
+
+export interface Category { category: string; subcategory: string; sort_order: number; }
+
+export interface Exercise {
+  id: string;
+  name: string;
+  category: string;
+  subcategory: string | null;
+  body_area: string | null;
+  video_url: string | null;
+  also_fits: string | null;
+  old_names: string[];
+  active: boolean;
+}
+export type ExerciseDraft = Omit<Exercise, 'id'>;
+
+export const DRILL_TYPES = ['Stationary', 'Dynamic', 'Finisher', 'Athletic'] as const;
+export interface Drill {
+  id: string;
+  name: string;
+  drill_type: (typeof DRILL_TYPES)[number];
+  reps: string | null;
+  ball_type: string | null;
+  video_url: string | null;
+  also_fits: string | null;
+  old_names: string[];
+  active: boolean;
+}
+export type DrillDraft = Omit<Drill, 'id'>;

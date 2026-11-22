@@ -14,6 +14,9 @@ name and the Supabase project URL.
 2. When it finishes, open **SQL Editor** → **New query**.
 3. Open `supabase/migrations/0001_core.sql` from this repo, paste the whole
    thing, and click **Run**. You should see "Success. No rows returned."
+   Then do the same with each later file in that folder, in number order
+   (`0002_library.sql` loads the exercise and throwing drill libraries).
+   Each file only needs to run once; re-running the library file is harmless.
 4. New query again, paste this with **your own Gmail**, and run it:
 
    ```sql
