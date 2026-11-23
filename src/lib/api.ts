@@ -1,5 +1,5 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import type { Category, Checkin, Drill, DrillDraft, Exercise, ExerciseDraft, Goal, GoalKind, Group, Membership, Person, PersonDraft } from './types';
+import type { Category, Checkin, GoodsItem, Drill, DrillDraft, Exercise, ExerciseDraft, Goal, GoalKind, Group, Membership, Person, PersonDraft } from './types';
 import { demoApi } from './demo';
 
 export interface Api {
@@ -28,6 +28,8 @@ export interface Api {
   saveCheckin(c: Pick<Checkin, 'person_id' | 'checkin_date' | 'bodyweight' | 'readiness' | 'note'>): Promise<Checkin>;
   checkinsOn(day: string): Promise<Checkin[]>;
   checkinHistory(personId: string, days: number): Promise<Checkin[]>;
+
+  currentGoods(personId: string): Promise<GoodsItem[]>;
 
   listCategories(): Promise<Category[]>;
   listExercises(): Promise<Exercise[]>;
@@ -116,6 +118,10 @@ function liveApi(sb: SupabaseClient): Api {
       const since = new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
       return must(await sb.from('current_checkins').select('*').eq('person_id', personId)
         .gte('checkin_date', since).order('checkin_date', { ascending: false })) as Checkin[];
+    },
+
+    async currentGoods(personId) {
+      return must(await sb.from('current_goods').select('*').eq('person_id', personId).order('sort_order')) as GoodsItem[];
     },
 
     async listCategories() {

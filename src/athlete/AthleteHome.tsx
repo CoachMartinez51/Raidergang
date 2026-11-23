@@ -3,6 +3,7 @@ import { api } from '../lib/api';
 import { isoDay, prettyDay } from '../lib/dates';
 import type { Checkin, Goal, GoalKind, Person } from '../lib/types';
 import { ErrorMsg, RpeBadge, RpePicker, TopBar } from '../ui/common';
+import { GoodsCard } from '../ui/Goods';
 
 export function AthleteHome({ me }: { me: Person }) {
   const today = isoDay();
@@ -14,10 +15,11 @@ export function AthleteHome({ me }: { me: Person }) {
         <CheckinCard me={me} day={today} onSaved={() => setVersion(v => v + 1)} />
         {me.is_pitcher && <Objectives me={me} />}
         <div className="section-title">Today's agenda</div>
+        {me.is_pitcher && <GoodsCard personId={me.id} />}
         <div className="card">
           <div className="muted small">
             {me.is_pitcher
-              ? 'The Goods, warm-up, Lift Prep, The Meatshack and throwing will show here once your coaches publish your program.'
+              ? 'Warm-up, Lift Prep, The Meatshack and throwing will show here once your coaches publish your program.'
               : 'Lift Prep and The Meatshack will show here once your coaches publish your program.'}
           </div>
         </div>
@@ -71,7 +73,7 @@ function CheckinCard({ me, day, onSaved }: { me: Person; day: string; onSaved: (
           <button className="link" onClick={startEdit}>Edit</button>
         </div>
         <div className="row" style={{ justifyContent: 'flex-start', gap: 14, fontSize: 15 }}>
-          <span><b>{saved.bodyweight}</b> lb</span>
+          <span><b>{saved.bodyweight}</b> lb{me.goal_weight ? <span className="muted small"> · goal {me.goal_weight}</span> : null}</span>
           <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>RPE <RpeBadge n={saved.readiness} /></span>
         </div>
         {saved.note && <div className="small muted">{saved.note}</div>}
@@ -81,7 +83,7 @@ function CheckinCard({ me, day, onSaved }: { me: Person; day: string; onSaved: (
 
   return (
     <div className="card">
-      <h2>Daily check-in</h2>
+      <div className="row"><h2>Daily check-in</h2>{me.goal_weight && <span className="small muted">Goal: {me.goal_weight}</span>}</div>
       <label className="field">Bodyweight (lb)
         <input className="input" inputMode="decimal" placeholder="e.g. 201.4" value={weight} onChange={e => setWeight(e.target.value)} />
       </label>
@@ -120,16 +122,16 @@ function Objectives({ me }: { me: Person }) {
 
 function RecentCheckins({ me }: { me: Person }) {
   const [rows, setRows] = useState<Checkin[]>([]);
-  useEffect(() => { api.checkinHistory(me.id, 14).then(setRows).catch(() => {}); }, [me.id]);
+  useEffect(() => { api.checkinHistory(me.id, 30).then(setRows).catch(() => {}); }, [me.id]);
   if (!rows.length) return null;
   return (
     <>
-      <div className="section-title">Last two weeks</div>
+      <div className="section-title">Last 30 days</div>
       <div className="card" style={{ gap: 8 }}>
         {rows.map(c => (
           <div className="row small" key={c.id}>
             <span className="muted" style={{ width: 90 }}>{prettyDay(c.checkin_date)}</span>
-            <span style={{ flex: 1 }}>{c.bodyweight ?? '–'} lb</span>
+            <span style={{ flex: 1 }}>{c.bodyweight ?? '–'} lb{c.note ? <span className="muted"> · {c.note.length > 40 ? c.note.slice(0, 40) + '…' : c.note}</span> : null}</span>
             <RpeBadge n={c.readiness} />
           </div>
         ))}

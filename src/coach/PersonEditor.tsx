@@ -4,6 +4,7 @@ import { prettyDay } from '../lib/dates';
 import { emptyPerson, fullName, type Checkin, type Goal, type GoalKind, type Person, type PersonDraft } from '../lib/types';
 import { ErrorMsg, RpeBadge } from '../ui/common';
 import type { RosterData } from './CoachHome';
+import { GoodsCard } from '../ui/Goods';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const KINDS: [GoalKind, string][] = [['body', 'BODY'], ['ball', 'BALL'], ['game', 'GAME']];
@@ -53,6 +54,7 @@ export function PersonEditor({ me, person, data, onClose, onSaved }: {
         first_name: d.first_name.trim(), last_name: d.last_name.trim(), email: d.email.trim().toLowerCase(),
         aliases: aliases.split(',').map(s => s.trim()).filter(Boolean),
         trackman_pitcher_id: d.trackman_pitcher_id?.trim() || null,
+        goal_weight: d.goal_weight?.trim() || null,
         coach_can_edit: d.is_coach ? d.coach_can_edit || d.is_admin : true,
         is_admin: d.is_coach && d.is_admin,
       };
@@ -97,6 +99,9 @@ export function PersonEditor({ me, person, data, onClose, onSaved }: {
           </label>
           <label className="field">Other spellings (comma separated)
             <input className="input" disabled={ro} placeholder="e.g. Galuski, Galusky" value={aliases} onChange={e => setAliases(e.target.value)} />
+          </label>
+          <label className="field">Goal weight (optional)
+            <input className="input" disabled={ro} placeholder="e.g. 204-207" value={d.goal_weight ?? ''} onChange={e => set('goal_weight', e.target.value)} />
           </label>
           <label className="field">Trackman pitcher ID (optional)
             <input className="input" disabled={ro} value={d.trackman_pitcher_id ?? ''} onChange={e => set('trackman_pitcher_id', e.target.value)} />
@@ -157,6 +162,8 @@ export function PersonEditor({ me, person, data, onClose, onSaved }: {
         <ErrorMsg error={error} />
         {!ro && <button className="btn" disabled={!valid || busy} onClick={save}>{busy ? 'Saving…' : isNew ? 'Add to roster' : 'Save changes'}</button>}
         {!valid && !ro && <span className="small muted">Needs a first and last name, a valid email, and at least one role.</span>}
+
+        {!isNew && person!.is_pitcher && <GoodsCard personId={person!.id} />}
 
         {!isNew && !d.is_coach && (
           <div className="card" style={{ gap: 8 }}>

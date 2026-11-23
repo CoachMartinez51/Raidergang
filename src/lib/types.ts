@@ -16,6 +16,7 @@ export interface Person {
   active: boolean;
   auth_user_id: string | null;
   first_signed_in_at: string | null;
+  goal_weight: string | null;
 }
 
 export type PersonDraft = Omit<Person, 'id' | 'auth_user_id' | 'first_signed_in_at'>;
@@ -36,15 +37,16 @@ export interface Checkin {
   person_id: string;
   checkin_date: string; // YYYY-MM-DD
   bodyweight: number | null;
-  readiness: number;
+  readiness: number | null;
   note: string | null;
   created_at: string;
+  source?: 'app' | 'sheet_import';
 }
 
 export const emptyPerson = (): PersonDraft => ({
   email: '', first_name: '', last_name: '', aliases: [], trackman_pitcher_id: null,
   is_pitcher: false, is_position_player: false, is_individual_pro: false,
-  is_coach: false, coach_can_edit: true, is_admin: false, active: true,
+  is_coach: false, coach_can_edit: true, is_admin: false, active: true, goal_weight: null,
 });
 
 export const fullName = (p: Pick<Person, 'first_name' | 'last_name'>) => `${p.first_name} ${p.last_name}`.trim();
@@ -88,3 +90,21 @@ export interface Drill {
   active: boolean;
 }
 export type DrillDraft = Omit<Drill, 'id'>;
+
+export type GoodsSection = 'soft_tissue' | 'correctives' | 'feels' | 'half_plyos' | 'full_plyos';
+export interface GoodsItem {
+  id: string;
+  person_id: string;
+  day: 'A' | 'B' | 'any';
+  section: GoodsSection;
+  sort_order: number;
+  name: string;
+  dose: string | null;
+  balls: string | null;
+  note: string | null;
+  video_url: string | null;
+}
+export const GOODS_LABELS: Record<GoodsSection, string> = {
+  soft_tissue: 'Soft tissue', correctives: 'Correctives', feels: 'Feels (pre-throw)',
+  half_plyos: 'Half plyos', full_plyos: 'Full plyos',
+};

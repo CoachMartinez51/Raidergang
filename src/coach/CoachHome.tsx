@@ -82,11 +82,11 @@ function CheckinBoard({ data, onOpen }: { data: RosterData; onOpen: (p: Person) 
   const sorted = [...shown].sort((a, b) => {
     const ca = byPerson.get(a.id), cb = byPerson.get(b.id);
     if (!ca !== !cb) return ca ? -1 : 1;                       // checked in first
-    if (ca && cb && ca.readiness !== cb.readiness) return ca.readiness - cb.readiness; // lowest RPE first
+    if (ca && cb && ca.readiness !== cb.readiness) return (ca.readiness ?? 99) - (cb.readiness ?? 99); // lowest RPE first
     return a.last_name.localeCompare(b.last_name);
   });
   const done = shown.filter(p => byPerson.has(p.id));
-  const flagged = done.filter(p => byPerson.get(p.id)!.readiness <= RPE_FLAG_AT);
+  const flagged = done.filter(p => (byPerson.get(p.id)!.readiness ?? 99) <= RPE_FLAG_AT);
   const isToday = day === isoDay();
 
   return (
@@ -108,7 +108,7 @@ function CheckinBoard({ data, onOpen }: { data: RosterData; onOpen: (p: Person) 
             <tbody>
               {sorted.map(p => {
                 const c = byPerson.get(p.id);
-                const low = c && c.readiness <= RPE_FLAG_AT;
+                const low = c && (c.readiness ?? 99) <= RPE_FLAG_AT;
                 return (
                   <tr key={p.id} className="click" onClick={() => onOpen(p)} style={low ? { boxShadow: 'inset 3px 0 0 #BB3A1C' } : undefined}>
                     <td><div style={{ fontWeight: 600 }}>{fullName(p)}</div><div className="small muted">{roleLabels(p).join(' · ')}</div></td>

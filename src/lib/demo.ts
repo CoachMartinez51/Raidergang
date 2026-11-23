@@ -1,7 +1,7 @@
 // Demo mode: runs entirely in the browser with sample data, used until the
 // app is connected to Supabase. Nothing here leaves the device.
 import type { Api } from './api';
-import type { Category, Checkin, Drill, Exercise, Goal, Group, Membership, Person } from './types';
+import type { Category, Checkin, GoodsItem, Drill, Exercise, Goal, Group, Membership, Person } from './types';
 import { addDays, isoDay } from './dates';
 
 const KEY = 'raidergang-demo-v1';
@@ -14,14 +14,14 @@ interface Db { people: Person[]; groups: Group[]; members: Membership[]; goals: 
 const base = (p: Partial<Person> & Pick<Person, 'email' | 'first_name' | 'last_name'>): Person => ({
   id: uid(), aliases: [], trackman_pitcher_id: null, is_pitcher: false, is_position_player: false,
   is_individual_pro: false, is_coach: false, coach_can_edit: true, is_admin: false, active: true,
-  auth_user_id: null, first_signed_in_at: null, ...p,
+  auth_user_id: null, first_signed_in_at: null, goal_weight: null, ...p,
 });
 
 function seed(): Db {
   const people = [
     base({ email: 'coach.martinez@example.com', first_name: 'Myles', last_name: 'Martinez', is_coach: true, is_admin: true }),
     base({ email: 'coach.ferrick@example.com', first_name: 'Travis', last_name: 'Ferrick', is_coach: true }),
-    base({ email: 'connor.jarvis@example.com', first_name: 'Connor', last_name: 'Jarvis', is_pitcher: true }),
+    base({ email: 'connor.jarvis@example.com', first_name: 'Connor', last_name: 'Jarvis', is_pitcher: true, goal_weight: '204-207' }),
     base({ email: 'ethan.wood@example.com', first_name: 'Ethan', last_name: 'Wood', is_position_player: true }),
     base({ email: 'pitcher.two@example.com', first_name: 'Sample', last_name: 'Pitcher', is_pitcher: true }),
   ];
@@ -119,6 +119,19 @@ export function demoApi(): Api & { signInAs(email: string): void; demoAccounts()
     async checkinHistory(personId, days) {
       const since = addDays(isoDay(), -days);
       return currentOf(load().checkins).filter(c => c.person_id === personId && c.checkin_date >= since).sort((a, b) => b.checkin_date.localeCompare(a.checkin_date));
+    },
+    async currentGoods(personId) {
+      const p = load().people.find(x => x.id === personId);
+      if (!p?.is_pitcher) return [];
+      const mk = (day: GoodsItem['day'], section: GoodsItem['section'], name: string, dose: string, i: number, balls: string | null = null): GoodsItem =>
+        ({ id: `${personId}-${section}-${day}-${i}`, person_id: personId, day, section, sort_order: i, name, dose, balls, note: null, video_url: 'https://youtube.com' });
+      return [
+        mk('A', 'soft_tissue', 'Thoracic Spine Soft Tissue', '1-3 min', 0), mk('A', 'soft_tissue', 'Posterior Cuff Soft Tissue 1', '1-3 min', 1),
+        mk('A', 'correctives', 'Shoulder CARs/Circles on Wall', '1 x 10 ea', 0), mk('A', 'correctives', 'Spinal Hygiene (WSU)', 'Until Comfort', 1),
+        mk('B', 'soft_tissue', 'Hip Soft Tissue', '1-3 min', 0), mk('B', 'correctives', 'Elevated Pigeon Stretch', '2 x 45 sec', 0),
+        mk('any', 'feels', 'Med Ball Duo (OH + Scoop Primer)', '2 x 5 ea', 0),
+        mk('any', 'half_plyos', 'Deadman Throws', '1-2 x 5-8', 0, 'Yellow, Red'), mk('any', 'full_plyos', 'Drop Step on Mound', '1-2 x 5-8', 0, 'Red, White, Grey'),
+      ];
     },
     async listCategories() { return (await withLibrary()).categories!; },
     async listExercises() { return [...(await withLibrary()).exercises!].sort((a, b) => a.name.localeCompare(b.name)); },
