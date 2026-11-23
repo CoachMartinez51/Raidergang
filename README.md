@@ -38,3 +38,5 @@ Rules the schema enforces:
 3. Lift blocks: builder, assignments, set logging
 4. The Goods, Lift Prep, throwing calendar
 5. Trackman + video (version 2)
+
+Live app: deployed on Vercel from the `main` branch; every push to `main` redeploys automatically.
