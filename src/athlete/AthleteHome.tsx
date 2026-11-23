@@ -4,6 +4,7 @@ import { isoDay, prettyDay } from '../lib/dates';
 import type { Checkin, Goal, GoalKind, Person } from '../lib/types';
 import { ErrorMsg, RpeBadge, RpePicker, TopBar } from '../ui/common';
 import { GoodsCard } from '../ui/Goods';
+import { LiftToday } from './Lift';
 
 export function AthleteHome({ me }: { me: Person }) {
   const today = isoDay();
@@ -16,13 +17,7 @@ export function AthleteHome({ me }: { me: Person }) {
         {me.is_pitcher && <Objectives me={me} />}
         <div className="section-title">Today's agenda</div>
         {me.is_pitcher && <GoodsCard personId={me.id} />}
-        <div className="card">
-          <div className="muted small">
-            {me.is_pitcher
-              ? 'Warm-up, Lift Prep, The Meatshack and throwing will show here once your coaches publish your program.'
-              : 'Lift Prep and The Meatshack will show here once your coaches publish your program.'}
-          </div>
-        </div>
+        <LiftToday me={me} />
         <RecentCheckins key={version} me={me} />
       </div>
     </div>

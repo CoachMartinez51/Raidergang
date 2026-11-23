@@ -1,6 +1,7 @@
 // Demo mode: runs entirely in the browser with sample data, used until the
 // app is connected to Supabase. Nothing here leaves the device.
 import type { Api } from './api';
+import type { Assignment, LiftBlock, RehabSwitch, SetLog } from './lifts';
 import type { Category, Checkin, GoodsItem, Drill, Exercise, Goal, Group, Membership, Person } from './types';
 import { addDays, isoDay } from './dates';
 
@@ -9,7 +10,25 @@ const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Math.random().toStr
 const now = () => new Date().toISOString();
 
 interface Db { people: Person[]; groups: Group[]; members: Membership[]; goals: Goal[]; checkins: Checkin[]; session: string | null;
-  categories?: Category[]; exercises?: Exercise[]; drills?: Drill[]; }
+  categories?: Category[]; exercises?: Exercise[]; drills?: Drill[];
+  assignments?: Assignment[]; rehab?: RehabSwitch[]; setLogs?: SetLog[]; }
+
+let blocksCache: LiftBlock[] | null = null;
+async function demoBlocks(): Promise<LiftBlock[]> {
+  if (!blocksCache) blocksCache = (await import('./demoBlocks.json')).default as unknown as LiftBlock[];
+  return blocksCache;
+}
+async function withLifts(): Promise<Db> {
+  const d = load();
+  if (!d.assignments) {
+    const blocks = await demoBlocks();
+    const starts = ['2026-11-23', '2026-12-21'];
+    d.assignments = d.people.filter(p => !p.is_coach).flatMap(p => blocks.map((b, i) => ({ id: uid(), block_id: b.id, person_id: p.id, start_date: starts[i] ?? starts[0], active: true })));
+    d.rehab = []; d.setLogs = [];
+    save(d);
+  }
+  return d;
+}
 
 const base = (p: Partial<Person> & Pick<Person, 'email' | 'first_name' | 'last_name'>): Person => ({
   id: uid(), aliases: [], trackman_pitcher_id: null, is_pitcher: false, is_position_player: false,
@@ -133,6 +152,36 @@ export function demoApi(): Api & { signInAs(email: string): void; demoAccounts()
         mk('any', 'half_plyos', 'Deadman Throws', '1-2 x 5-8', 0, 'Yellow, Red'), mk('any', 'full_plyos', 'Drop Step on Mound', '1-2 x 5-8', 0, 'Red, White, Grey'),
       ];
     },
+    async listBlocks() { return demoBlocks(); },
+    async assignmentsFor(personId) { const d = await withLifts(); return d.assignments!.filter(a => a.active && (!personId || a.person_id === personId)); },
+    async assignBlock(blockId, personIds, startDate) {
+      const d = await withLifts(); let n = 0;
+      for (const person_id of personIds) {
+        if (d.assignments!.some(a => a.block_id === blockId && a.person_id === person_id && a.start_date === startDate)) continue;
+        d.assignments!.push({ id: uid(), block_id: blockId, person_id, start_date: startDate, active: true }); n++;
+      }
+      save(d); return n;
+    },
+    async endAssignment(id) { const d = await withLifts(); const a = d.assignments!.find(x => x.id === id); if (a) a.active = false; save(d); },
+    async rehabSwitches(personId) { const d = await withLifts(); return d.rehab!.filter(r => r.active && (!personId || r.person_id === personId)); },
+    async setRehab(personId, blockExerciseId, on) {
+      const d = await withLifts();
+      if (on) d.rehab!.push({ id: uid(), person_id: personId, block_exercise_id: blockExerciseId, active: true });
+      else d.rehab!.filter(r => r.person_id === personId && r.block_exercise_id === blockExerciseId).forEach(r => (r.active = false));
+      save(d);
+    },
+    async setLogs({ personId, from, to, blockExerciseIds }) {
+      const d = await withLifts(); const m = new Map<string, SetLog>();
+      for (const l of d.setLogs!) {
+        if (personId && l.person_id !== personId) continue;
+        if (l.log_date < from || l.log_date > to) continue;
+        if (blockExerciseIds?.length && !blockExerciseIds.includes(l.block_exercise_id)) continue;
+        const k = `${l.person_id}|${l.block_exercise_id}|${l.log_date}|${l.set_number}`;
+        const prev = m.get(k); if (!prev || prev.created_at < l.created_at) m.set(k, l);
+      }
+      return [...m.values()].sort((a, b) => b.log_date.localeCompare(a.log_date));
+    },
+    async logSet(row) { const d = await withLifts(); const r = { ...row, id: uid(), created_at: now() }; d.setLogs!.push(r); save(d); return r; },
     async listCategories() { return (await withLibrary()).categories!; },
     async listExercises() { return [...(await withLibrary()).exercises!].sort((a, b) => a.name.localeCompare(b.name)); },
     async saveExercise(id, e) {

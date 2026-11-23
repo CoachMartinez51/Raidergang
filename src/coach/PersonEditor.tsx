@@ -5,6 +5,7 @@ import { emptyPerson, fullName, type Checkin, type Goal, type GoalKind, type Per
 import { ErrorMsg, RpeBadge } from '../ui/common';
 import type { RosterData } from './CoachHome';
 import { GoodsCard } from '../ui/Goods';
+import { RehabPanel } from './Lifts';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const KINDS: [GoalKind, string][] = [['body', 'BODY'], ['ball', 'BALL'], ['game', 'GAME']];
@@ -164,6 +165,7 @@ export function PersonEditor({ me, person, data, onClose, onSaved }: {
         {!valid && !ro && <span className="small muted">Needs a first and last name, a valid email, and at least one role.</span>}
 
         {!isNew && person!.is_pitcher && <GoodsCard personId={person!.id} />}
+        {!isNew && !person!.is_coach && <RehabPanel me={me} person={person!} />}
 
         {!isNew && !d.is_coach && (
           <div className="card" style={{ gap: 8 }}>

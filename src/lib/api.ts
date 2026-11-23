@@ -1,6 +1,7 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { Category, Checkin, GoodsItem, Drill, DrillDraft, Exercise, ExerciseDraft, Goal, GoalKind, Group, Membership, Person, PersonDraft } from './types';
 import { demoApi } from './demo';
+import type { Assignment, LiftBlock, RehabSwitch, SetLog } from './lifts';
 
 export interface Api {
   mode: 'live' | 'demo';
@@ -30,6 +31,15 @@ export interface Api {
   checkinHistory(personId: string, days: number): Promise<Checkin[]>;
 
   currentGoods(personId: string): Promise<GoodsItem[]>;
+
+  listBlocks(): Promise<LiftBlock[]>;
+  assignmentsFor(personId: string | null): Promise<Assignment[]>;
+  assignBlock(blockId: string, personIds: string[], startDate: string): Promise<number>;
+  endAssignment(id: string): Promise<void>;
+  rehabSwitches(personId: string | null): Promise<RehabSwitch[]>;
+  setRehab(personId: string, blockExerciseId: string, on: boolean): Promise<void>;
+  setLogs(opts: { personId?: string; from: string; to: string; blockExerciseIds?: string[] }): Promise<SetLog[]>;
+  logSet(row: Omit<SetLog, 'id' | 'created_at'>): Promise<SetLog>;
 
   listCategories(): Promise<Category[]>;
   listExercises(): Promise<Exercise[]>;
@@ -122,6 +132,47 @@ function liveApi(sb: SupabaseClient): Api {
 
     async currentGoods(personId) {
       return must(await sb.from('current_goods').select('*').eq('person_id', personId).order('sort_order')) as GoodsItem[];
+    },
+
+    async listBlocks() {
+      const rows = must(await sb.from('lift_blocks')
+        .select('*, days:block_days(*, prep:lift_preps(*), exercises:block_exercises(*, exercise:exercises(name, video_url)))')
+        .order('name')) as LiftBlock[];
+      for (const b of rows) {
+        b.days.sort((a, c) => a.weekday - c.weekday);
+        for (const d of b.days) d.exercises.sort((a, c) => a.sort_order - c.sort_order);
+      }
+      return rows;
+    },
+    async assignmentsFor(personId) {
+      let q = sb.from('block_assignments').select('*').eq('active', true);
+      if (personId) q = q.eq('person_id', personId);
+      return must(await q) as Assignment[];
+    },
+    async assignBlock(blockId, personIds, startDate) {
+      if (!personIds.length) return 0;
+      const rows = personIds.map(person_id => ({ block_id: blockId, person_id, start_date: startDate }));
+      const r = must(await sb.from('block_assignments').upsert(rows, { onConflict: 'block_id,person_id,start_date', ignoreDuplicates: true }).select('id')) as { id: string }[];
+      return r.length;
+    },
+    async endAssignment(id) { must(await sb.from('block_assignments').update({ active: false }).eq('id', id)); },
+    async rehabSwitches(personId) {
+      let q = sb.from('rehab_switches').select('*').eq('active', true);
+      if (personId) q = q.eq('person_id', personId);
+      return must(await q) as RehabSwitch[];
+    },
+    async setRehab(personId, blockExerciseId, on) {
+      if (on) must(await sb.from('rehab_switches').insert({ person_id: personId, block_exercise_id: blockExerciseId }));
+      else must(await sb.from('rehab_switches').update({ active: false }).eq('person_id', personId).eq('block_exercise_id', blockExerciseId).eq('active', true));
+    },
+    async setLogs({ personId, from, to, blockExerciseIds }) {
+      let q = sb.from('current_set_logs').select('*').gte('log_date', from).lte('log_date', to);
+      if (personId) q = q.eq('person_id', personId);
+      if (blockExerciseIds?.length) q = q.in('block_exercise_id', blockExerciseIds);
+      return must(await q.order('log_date', { ascending: false }).range(0, 4999)) as SetLog[];
+    },
+    async logSet(row) {
+      return must(await sb.from('set_logs').insert(row).select().single()) as SetLog;
     },
 
     async listCategories() {
