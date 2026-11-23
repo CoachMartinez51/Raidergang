@@ -81,3 +81,40 @@ select.input { appearance: none; }
 .lib-row:last-child { border-bottom: none; }
 .lib-row:hover { background: #20241E; }
 select.input option { background: var(--card); }
+
+/* ---------- Printable lift sheet ---------- */
+.print-root { position: fixed; inset: 0; z-index: 100; overflow: auto; background: #fff; color: #111; font-family: Inter, Arial, sans-serif; padding: 16px; }
+.print-toolbar { position: sticky; top: 0; background: #fff; display: flex; gap: 8px; align-items: center; padding: 8px 0 12px; border-bottom: 1px solid #ddd; margin-bottom: 12px; flex-wrap: wrap; z-index: 2; }
+.print-page { margin-bottom: 28px; }
+.print-head { display: flex; align-items: center; gap: 12px; background: #0F110E; color: #fff; padding: 8px 12px; border-radius: 6px; }
+.print-logo { height: 30px; }
+.print-title { font-family: 'Space Grotesk', Inter, sans-serif; font-weight: 700; font-size: 16px; color: #E6B53E; }
+.print-sub { font-size: 11px; color: #ddd; }
+.print-note { font-size: 11px; margin: 6px 0; padding: 5px 8px; background: #FFF6DD; border: 1px solid #E6B53E; border-radius: 4px; }
+.print-table { width: 100%; border-collapse: collapse; font-size: 10.5px; margin-top: 6px; }
+.print-table th, .print-table td { border: 1px solid #999; padding: 3px 5px; vertical-align: top; }
+.print-table thead th { background: #274E13; color: #fff; font-weight: 600; text-align: center; }
+.print-table thead tr.sub th { background: #E9EFE5; color: #222; font-weight: 600; font-size: 9.5px; }
+.print-table td.slot { font-weight: 700; text-align: center; color: #274E13; }
+.print-table td.ex { min-width: 150px; }
+.print-table td.reps { text-align: center; white-space: nowrap; }
+.print-table td.wt { min-width: 44px; text-align: center; font-weight: 600; }
+.print-table td.na { background: #F1F1F1; }
+.print-table tr.first td { border-top: 2px solid #444; }
+.print-table tr.prep td { background: #FAFAF6; }
+.prep-items { display: flex; flex-wrap: wrap; gap: 2px 12px; margin-top: 2px; }
+.muted-print { color: #555; font-size: 9.5px; }
+@media print {
+  @page { size: landscape; margin: 0.35in; }
+  body.printing > #root { display: none !important; }
+  body.printing { background: #fff !important; }
+  .print-root { position: static; overflow: visible; padding: 0; }
+  .no-print { display: none !important; }
+  .print-page { page-break-after: always; break-after: page; margin: 0; }
+  .print-page:last-child { page-break-after: auto; break-after: auto; }
+  .print-head { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .print-table thead th, .print-table td.na, .print-note { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+
+.greet { animation: greetIn .5s ease-out; }
+@keyframes greetIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }

@@ -1,7 +1,7 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { Category, Checkin, GoodsItem, Drill, DrillDraft, Exercise, ExerciseDraft, Goal, GoalKind, Group, Membership, Person, PersonDraft } from './types';
 import { demoApi } from './demo';
-import type { Assignment, LiftBlock, RehabSwitch, SetLog } from './lifts';
+import type { Assignment, BlockDay, LiftBlock, LiftPrep, PrepItem, RehabSwitch, SetLog } from './lifts';
 
 export interface Api {
   mode: 'live' | 'demo';
@@ -33,6 +33,7 @@ export interface Api {
   currentGoods(personId: string): Promise<GoodsItem[]>;
 
   listBlocks(): Promise<LiftBlock[]>;
+  savePrep(block: LiftBlock, day: BlockDay, items: PrepItem[]): Promise<LiftPrep>;
   assignmentsFor(personId: string | null): Promise<Assignment[]>;
   assignBlock(blockId: string, personIds: string[], startDate: string): Promise<number>;
   endAssignment(id: string): Promise<void>;
@@ -142,7 +143,23 @@ function liveApi(sb: SupabaseClient): Api {
         b.days.sort((a, c) => a.weekday - c.weekday);
         for (const d of b.days) d.exercises.sort((a, c) => a.sort_order - c.sort_order);
       }
+      // Lifting Prep items: use the Library's current video link
+      const ids = [...new Set(rows.flatMap(b => b.days.flatMap(d => (d.prep?.items ?? []).map(i => i.exercise_id).filter(Boolean))))] as string[];
+      if (ids.length) {
+        const vids = must(await sb.from('exercises').select('id, video_url').in('id', ids)) as { id: string; video_url: string | null }[];
+        const m = new Map(vids.map(v => [v.id, v.video_url]));
+        for (const b of rows) for (const d of b.days) for (const i of d.prep?.items ?? []) if (i.exercise_id && m.get(i.exercise_id)) i.video_url = m.get(i.exercise_id)!;
+      }
       return rows;
+    },
+    async savePrep(block, day, items) {
+      if (day.prep_id) {
+        return must(await sb.from('lift_preps').update({ items }).eq('id', day.prep_id).select().single()) as LiftPrep;
+      }
+      const name = `${block.name} · ${['', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][day.weekday]} Lifting Prep`;
+      const prep = must(await sb.from('lift_preps').insert({ name, items }).select().single()) as LiftPrep;
+      must(await sb.from('block_days').update({ prep_id: prep.id }).eq('id', day.id));
+      return prep;
     },
     async assignmentsFor(personId) {
       let q = sb.from('block_assignments').select('*').eq('active', true);

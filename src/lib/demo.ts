@@ -153,6 +153,11 @@ export function demoApi(): Api & { signInAs(email: string): void; demoAccounts()
       ];
     },
     async listBlocks() { return demoBlocks(); },
+    async savePrep(_block, day, items) {
+      const prep = { id: day.prep_id ?? uid(), name: day.prep?.name ?? 'Lifting Prep', items };
+      for (const b of await demoBlocks()) for (const d of b.days) if (d.id === day.id) { d.prep = prep; d.prep_id = prep.id; }
+      return prep;
+    },
     async assignmentsFor(personId) { const d = await withLifts(); return d.assignments!.filter(a => a.active && (!personId || a.person_id === personId)); },
     async assignBlock(blockId, personIds, startDate) {
       const d = await withLifts(); let n = 0;

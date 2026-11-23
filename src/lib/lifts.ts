@@ -20,7 +20,7 @@ export interface BlockExercise {
   exercise?: { name: string; video_url: string | null } | null;
 }
 
-export interface PrepItem { name: string; exercise_id: string | null; video_url: string | null }
+export interface PrepItem { name: string; exercise_id: string | null; video_url: string | null; dose?: string | null }
 export interface LiftPrep { id: string; name: string; items: PrepItem[] }
 
 export interface BlockDay {
@@ -73,7 +73,8 @@ export const WEEKDAY_SHORT = ['', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun
 export const WEEKDAY_LONG = ['', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
 export const exName = (e: BlockExercise) => e.exercise?.name ?? e.custom_name ?? 'Exercise';
-export const exVideo = (e: BlockExercise) => e.video_url || e.exercise?.video_url || null;
+// The Library's link wins, so fixing a video in the Library updates every lift that uses it.
+export const exVideo = (e: BlockExercise) => e.exercise?.video_url || e.video_url || null;
 
 export const isoWeekday = (iso: string) => {
   const [y, m, d] = iso.split('-').map(Number);

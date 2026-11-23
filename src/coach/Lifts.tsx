@@ -7,6 +7,8 @@ import {
 } from '../lib/lifts';
 import { fullName, type Person } from '../lib/types';
 import { ErrorMsg } from '../ui/common';
+import { PrepEditor, PrepList } from '../ui/Prep';
+import { PrintBlock } from '../ui/PrintBlock';
 import type { RosterData } from './CoachHome';
 
 type View = 'today' | 'blocks';
@@ -117,6 +119,8 @@ function Blocks({ me, data, blocks, assignments, onChanged }: {
   const [sel, setSel] = useState<string[]>([]);
   const [msg, setMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [editPrep, setEditPrep] = useState(false);
+  const [printing, setPrinting] = useState(false);
   const athletes = data.people.filter(p => p.active && !p.is_coach);
   const inGroup = (gid: string) => data.members.filter(m => m.group_id === gid).map(m => m.person_id);
   const pick = (ids: string[]) => setSel(s => { const all = ids.every(i => s.includes(i)); return all ? s.filter(x => !ids.includes(x)) : [...new Set([...s, ...ids])]; });
@@ -133,13 +137,17 @@ function Blocks({ me, data, blocks, assignments, onChanged }: {
 
   return (
     <>
-      <div className="chips">
-        {blocks.map(b => <button key={b.id} className={`toggle ${b.id === blockId ? 'on' : ''}`} onClick={() => { setBlockId(b.id); setDayId(null); }}>{b.name}</button>)}
+      <div className="row" style={{ flexWrap: 'wrap' }}>
+        <div className="chips">
+          {blocks.map(b => <button key={b.id} className={`toggle ${b.id === blockId ? 'on' : ''}`} onClick={() => { setBlockId(b.id); setDayId(null); }}>{b.name}</button>)}
+        </div>
+        <button className="btn ghost small" onClick={() => setPrinting(true)}>Print / PDF</button>
       </div>
+      {printing && <PrintBlock block={block} startDate={starts[0]} onClose={() => setPrinting(false)} />}
       {block.notes && <div className="small muted">{block.notes}</div>}
       <div className="row" style={{ flexWrap: 'wrap' }}>
         <div className="chips">
-          {block.days.map(d => <button key={d.id} className={`toggle ${d.id === day?.id ? 'on' : ''}`} onClick={() => setDayId(d.id)}>{WEEKDAY_LONG[d.weekday]} · {d.label}</button>)}
+          {block.days.map(d => <button key={d.id} className={`toggle ${d.id === day?.id ? 'on' : ''}`} onClick={() => { setDayId(d.id); setEditPrep(false); }}>{WEEKDAY_LONG[d.weekday]} · {d.label}</button>)}
         </div>
         <div className="chips">
           {Array.from({ length: block.weeks }, (_, i) => i + 1).map(w => <button key={w} className={`toggle ${w === week ? 'on' : ''}`} onClick={() => setWeek(w)}>Wk {w}</button>)}
@@ -147,10 +155,15 @@ function Blocks({ me, data, blocks, assignments, onChanged }: {
       </div>
       {day && (
         <div className="card scroll-x" style={{ padding: 6 }}>
-          <div className="small" style={{ padding: '6px 8px' }}>
-            <b>{day.prep?.name ?? 'No Lift Prep'}</b>
-            {day.focus === 'lower' && day.sprints[week - 1] ? <> · Sprints {day.sprints[week - 1]}</> : day.focus === 'upper' ? <span className="muted"> · No sprints on upper days</span> : null}
-            {day.notes ? <div className="muted">{day.notes}</div> : null}
+          {day.notes ? <div className="small muted" style={{ padding: '6px 8px' }}>{day.notes}</div> : null}
+          <div style={{ padding: '6px 8px 10px', borderBottom: '1px solid var(--line)' }}>
+            <div className="row" style={{ marginBottom: 6 }}>
+              <span><b style={{ color: 'var(--gold)' }}>LP</b> <b>Lifting Prep</b> <span className="small muted">{day.prep?.name ?? ''}{day.focus === 'upper' ? ' · no sprints on upper days' : ''}</span></span>
+              {me.coach_can_edit && !editPrep && <button className="btn ghost small" onClick={() => setEditPrep(true)}>Edit</button>}
+            </div>
+            {editPrep
+              ? <PrepEditor key={day.id} block={block} day={day} onCancel={() => setEditPrep(false)} onSaved={() => { setEditPrep(false); onChanged(); }} />
+              : <PrepList day={day} week={week} compact />}
           </div>
           <table className="table">
             <thead><tr><th>Slot</th><th>Exercise</th><th>Week {week}</th><th>Cue</th><th>Rehab option</th></tr></thead>

@@ -7,6 +7,9 @@ import {
 } from '../lib/lifts';
 import type { Person } from '../lib/types';
 import { ErrorMsg } from '../ui/common';
+import { PrepList } from '../ui/Prep';
+import { PrintBlock } from '../ui/PrintBlock';
+import { fullName } from '../lib/types';
 
 interface Loaded {
   blocks: LiftBlock[];
@@ -23,6 +26,7 @@ export function LiftToday({ me }: { me: Person }) {
   const [data, setData] = useState<Loaded | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [picked, setPicked] = useState<string | null>(null);   // block_day id the athlete tapped
+  const [printing, setPrinting] = useState(false);
 
   const load = () => Promise.all([
     api.listBlocks(), api.assignmentsFor(me.id), api.rehabSwitches(me.id),
@@ -47,6 +51,7 @@ export function LiftToday({ me }: { me: Person }) {
     <>
       <div className="chips" style={{ alignItems: 'center' }}>
         <span className="small muted" style={{ marginRight: 4 }}>{block.name} · Week {week}</span>
+        <button className="toggle" style={{ height: 30, marginLeft: 'auto' }} onClick={() => setPrinting(true)}>Print / PDF</button>
         {block.days.map(d => {
           const dt = dateFor(assignment.start_date, block, week, d.weekday);
           const on = day?.id === d.id;
@@ -57,11 +62,12 @@ export function LiftToday({ me }: { me: Person }) {
           );
         })}
       </div>
+      {printing && <PrintBlock block={block} athlete={fullName(me)} startDate={assignment.start_date}
+        logs={data.logs.filter(l => block.days.some(d => d.exercises.some(e => e.id === l.block_exercise_id)))} onClose={() => setPrinting(false)} />}
       {!day ? (
         <div className="card"><h2>Rest day</h2><div className="small muted">No lift scheduled today. Tap a day above to look ahead.</div></div>
       ) : (
         <>
-          <PrepCard day={day} week={week} />
           <MeatshackCard me={me} day={day} week={week} date={dayDate} data={data} onLogged={l => setData(d => d && { ...d, logs: [l, ...d.logs] })} />
         </>
       )}
@@ -69,31 +75,11 @@ export function LiftToday({ me }: { me: Person }) {
   );
 }
 
-function PrepCard({ day, week }: { day: BlockDay; week: number }) {
-  const sprint = day.focus === 'lower' ? day.sprints[week - 1] : '';
-  if (!day.prep && !sprint && !day.warmup) return null;
-  return (
-    <div className="card" style={{ gap: 8 }}>
-      <div className="row"><h2>Lift Prep</h2>{day.prep && <span className="small muted">{day.prep.name}</span>}</div>
-      {day.prep?.items.map((it, i) => (
-        <div key={i} className="row small" style={{ borderBottom: '1px solid var(--line)', padding: '6px 0' }}>
-          <span style={{ fontWeight: it.video_url ? 600 : 400, color: it.video_url ? 'var(--text)' : 'var(--muted)' }}>{it.name}</span>
-          {it.video_url && <a href={it.video_url} target="_blank" rel="noreferrer" style={{ fontWeight: 600, flexShrink: 0 }}>Video ↗</a>}
-        </div>
-      ))}
-      {sprint && (
-        <div className="msg info" style={{ display: 'flex', gap: 8 }}><b>Sprints</b><span>{sprint}</span></div>
-      )}
-      {day.warmup && <div className="small muted">{day.warmup}</div>}
-    </div>
-  );
-}
-
 function MeatshackCard({ me, day, week, date, data, onLogged }: {
   me: Person; day: BlockDay; week: number; date: string; data: Loaded; onLogged: (l: SetLog) => void;
 }) {
-  const [open, setOpen] = useState<string | null>(day.exercises[0]?.id ?? null);
-  useEffect(() => { setOpen(day.exercises[0]?.id ?? null); }, [day.id]);
+  const [open, setOpen] = useState<string | null>('prep');
+  useEffect(() => { setOpen('prep'); }, [day.id]);
   const todays = data.logs.filter(l => l.log_date === date);
   const loggable = canLogOn(date);
 
@@ -105,6 +91,17 @@ function MeatshackCard({ me, day, week, date, data, onLogged }: {
       </div>
       {day.notes && <div className="msg info" style={{ marginBottom: 8 }}>{day.notes}</div>}
       {!loggable && <div className="small muted" style={{ marginBottom: 8 }}>Logging opens on {prettyDay(date)}.</div>}
+      <div style={{ borderTop: '1px solid var(--line)' }}>
+        <button onClick={() => setOpen(o => (o === 'prep' ? null : 'prep'))} style={{ width: '100%', background: 'none', border: 'none', color: 'var(--text)', padding: '12px 0', display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left' }}>
+          <span style={{ fontFamily: "'Space Grotesk', Inter, sans-serif", fontWeight: 700, color: 'var(--gold)', width: 26 }}>LP</span>
+          <span style={{ flex: 1 }}>
+            <span style={{ display: 'block', fontWeight: 600, fontSize: 15 }}>Lifting Prep</span>
+            <span className="small muted">{[day.prep?.name, day.focus === 'lower' && day.sprints[week - 1] ? 'Sprints' : null].filter(Boolean).join(' · ') || 'Before A1'}</span>
+          </span>
+          <span className="muted">{open === 'prep' ? '▾' : '▸'}</span>
+        </button>
+        {open === 'prep' && <div style={{ paddingBottom: 14 }}><PrepList day={day} week={week} /></div>}
+      </div>
       {day.exercises.map(e => (
         <ExerciseRow key={e.id} me={me} e={e} week={week} date={date} loggable={loggable}
           open={open === e.id} onToggle={() => setOpen(o => (o === e.id ? null : e.id))}
