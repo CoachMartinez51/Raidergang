@@ -9,22 +9,22 @@
  *      - a full .json file each night (the last 60 nights are kept)
  *      - a "Raidergang Backup (readable)" sheet, refreshed each night
  *
- * Fill in the two lines marked PASTE, save, then run setUp once.
+ * Fill in the two lines marked PASTE, save, then run raidergangSetUp once.
  */
 
-const SUPABASE_URL = 'https://fjrcbjwpmapetbcqfbwm.supabase.co';
-const PUBLISHABLE_KEY = 'PASTE the publishable key (starts with sb_publishable_)';
-const TOKEN = 'PASTE the "Coaching Database script" token from the SQL result';
+const RG_SUPABASE_URL = 'https://fjrcbjwpmapetbcqfbwm.supabase.co';
+const RG_PUBLISHABLE_KEY = 'PASTE the publishable key (starts with sb_publishable_)';
+const RG_TOKEN = 'PASTE the "Coaching Database script" token from the SQL result';
 
-const BACKUP_FOLDER = 'Raidergang Backups';
-const KEEP_NIGHTS = 60;
+const RG_BACKUP_FOLDER = 'Raidergang Backups';
+const RG_KEEP_NIGHTS = 60;
 
 // Column headings in row 1 of each tab → what the app calls them
-const EXERCISE_COLUMNS = {
+const RG_EXERCISE_COLUMNS = {
   'exercise': 'name', 'category': 'category', 'subcategory': 'subcategory',
   'body area': 'body_area', 'video': 'video', 'also fits': 'also_fits',
 };
-const DRILL_COLUMNS = {
+const RG_DRILL_COLUMNS = {
   'drill': 'name', 'drill type': 'drill_type', 'reps': 'reps',
   'ball type': 'ball_type', 'video': 'video', 'also fits': 'also_fits',
 };
@@ -32,44 +32,47 @@ const DRILL_COLUMNS = {
 // ---------------------------------------------------------------------
 // Menu + one-time setup
 // ---------------------------------------------------------------------
-function onOpen() {
+// Added by an installable trigger (see raidergangSetUp), so it never
+// clashes with an onOpen() that other scripts in this sheet already have.
+function raidergangMenu() {
   SpreadsheetApp.getUi().createMenu('Raidergang')
-    .addItem('Send library to the app now', 'syncLibrary')
-    .addItem('Back up app data now', 'backupNow')
+    .addItem('Send library to the app now', 'raidergangSyncLibrary')
+    .addItem('Back up app data now', 'raidergangBackupNow')
     .addSeparator()
-    .addItem('Turn on automatic sync + nightly backup', 'setUp')
+    .addItem('Turn on automatic sync + nightly backup', 'raidergangSetUp')
     .addToUi();
 }
 
 /** Run once. Safe to run again: it replaces its own timers. */
-function setUp() {
+function raidergangSetUp() {
   ScriptApp.getProjectTriggers().forEach(t => {
-    if (['syncLibrary', 'backupNow'].indexOf(t.getHandlerFunction()) >= 0) ScriptApp.deleteTrigger(t);
+    if (['raidergangSyncLibrary', 'raidergangBackupNow', 'raidergangMenu'].indexOf(t.getHandlerFunction()) >= 0) ScriptApp.deleteTrigger(t);
   });
-  ScriptApp.newTrigger('syncLibrary').timeBased().everyMinutes(15).create();
-  ScriptApp.newTrigger('backupNow').timeBased().everyDays(1).atHour(3).create();
-  const r = syncLibrary();
-  backupNow();
-  say_('All set. Library synced (' + r.exercises_added + ' new, ' + r.exercises_updated + ' updated) and the first backup is in your Drive folder "' + BACKUP_FOLDER + '".');
+  ScriptApp.newTrigger('raidergangMenu').forSpreadsheet(SpreadsheetApp.getActive()).onOpen().create();
+  ScriptApp.newTrigger('raidergangSyncLibrary').timeBased().everyMinutes(15).create();
+  ScriptApp.newTrigger('raidergangBackupNow').timeBased().everyDays(1).atHour(3).create();
+  const r = raidergangSyncLibrary();
+  raidergangBackupNow();
+  rgSay_('All set. Library synced (' + r.exercises_added + ' new, ' + r.exercises_updated + ' updated) and the first backup is in your Drive folder "' + RG_BACKUP_FOLDER + '".');
 }
 
 // ---------------------------------------------------------------------
 // Library sync (the sheet wins)
 // ---------------------------------------------------------------------
-function syncLibrary() {
+function raidergangSyncLibrary() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const exercises = readTab_(ss, 'Exercise Library', EXERCISE_COLUMNS);
-  const drills = readTab_(ss, 'Throwing Drill Library', DRILL_COLUMNS);
-  const r = rpc_('sheet_sync_library', { p_token: TOKEN, p_exercises: exercises, p_drills: drills });
+  const exercises = rgReadTab_(ss, 'Exercise Library', RG_EXERCISE_COLUMNS);
+  const drills = rgReadTab_(ss, 'Throwing Drill Library', RG_DRILL_COLUMNS);
+  const r = rgRpc_('sheet_sync_library', { p_token: RG_TOKEN, p_exercises: exercises, p_drills: drills });
   const changed = r.exercises_added + r.exercises_updated + r.drills_added + r.drills_updated;
   if (changed) console.log('Library sync: ' + JSON.stringify(r));
-  toast_(changed ? ('Sent to app: ' + r.exercises_added + ' new, ' + r.exercises_updated + ' updated exercises; ' +
+  rgToast_(changed ? ('Sent to app: ' + r.exercises_added + ' new, ' + r.exercises_updated + ' updated exercises; ' +
                     (r.drills_added + r.drills_updated) + ' drill changes.') : 'App library already matches the sheet.');
   return r;
 }
 
 /** Reads a tab by its row-1 headings, so moving columns around is fine. */
-function readTab_(ss, name, columns) {
+function rgReadTab_(ss, name, columns) {
   const sh = ss.getSheetByName(name);
   if (!sh) throw new Error('Could not find a tab named "' + name + '".');
   const range = sh.getDataRange();
@@ -97,44 +100,44 @@ function readTab_(ss, name, columns) {
 // ---------------------------------------------------------------------
 // Nightly backup
 // ---------------------------------------------------------------------
-function backupNow() {
-  const tables = rpc_('backup_tables', { p_token: TOKEN });
-  const dump = { exported_at: new Date().toISOString(), source: SUPABASE_URL, tables: {} };
+function raidergangBackupNow() {
+  const tables = rgRpc_('backup_tables', { p_token: RG_TOKEN });
+  const dump = { exported_at: new Date().toISOString(), source: RG_SUPABASE_URL, tables: {} };
   tables.forEach(t => {
     const rows = [];
     for (let off = 0; off < t.row_count; off += 2000) {
-      const page = rpc_('backup_page', { p_token: TOKEN, p_table: t.table_name, p_offset: off, p_limit: 2000 });
+      const page = rgRpc_('backup_page', { p_token: RG_TOKEN, p_table: t.table_name, p_offset: off, p_limit: 2000 });
       Array.prototype.push.apply(rows, page);
     }
     dump.tables[t.table_name] = rows;
   });
 
-  const folder = folder_();
+  const folder = rgFolder_();
   const stamp = Utilities.formatDate(new Date(), 'America/New_York', 'yyyy-MM-dd');
   const fileName = 'raidergang-backup-' + stamp + '.json';
   const same = folder.getFilesByName(fileName);      // re-running today replaces today's file
   while (same.hasNext()) same.next().setTrashed(true);
   folder.createFile(fileName, JSON.stringify(dump), 'application/json');
-  prune_(folder);
-  writeReadable_(folder, dump);
-  toast_('Backup saved to Drive → ' + BACKUP_FOLDER);
+  rgPrune_(folder);
+  rgWriteReadable_(folder, dump);
+  rgToast_('Backup saved to Drive → ' + RG_BACKUP_FOLDER);
 }
 
-function folder_() {
-  const it = DriveApp.getFoldersByName(BACKUP_FOLDER);
-  return it.hasNext() ? it.next() : DriveApp.createFolder(BACKUP_FOLDER);
+function rgFolder_() {
+  const it = DriveApp.getFoldersByName(RG_BACKUP_FOLDER);
+  return it.hasNext() ? it.next() : DriveApp.createFolder(RG_BACKUP_FOLDER);
 }
 
-function prune_(folder) {
+function rgPrune_(folder) {
   const files = [];
   const it = folder.getFiles();
   while (it.hasNext()) { const f = it.next(); if (/^raidergang-backup-.*\.json$/.test(f.getName())) files.push(f); }
   files.sort((a, b) => b.getName().localeCompare(a.getName()));
-  files.slice(KEEP_NIGHTS).forEach(f => f.setTrashed(true));
+  files.slice(RG_KEEP_NIGHTS).forEach(f => f.setTrashed(true));
 }
 
 /** One tab per table, with athlete names next to their ids, so it reads like a normal sheet. */
-function writeReadable_(folder, dump) {
+function rgWriteReadable_(folder, dump) {
   const props = PropertiesService.getScriptProperties();
   let ss = null;
   const id = props.getProperty('readableBackupId');
@@ -179,13 +182,13 @@ function writeReadable_(folder, dump) {
 // ---------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------
-function rpc_(fn, body) {
-  if (PUBLISHABLE_KEY.indexOf('PASTE') === 0 || TOKEN.indexOf('PASTE') === 0) {
-    throw new Error('Fill in PUBLISHABLE_KEY and TOKEN at the top of the script first.');
+function rgRpc_(fn, body) {
+  if (RG_PUBLISHABLE_KEY.indexOf('PASTE') === 0 || RG_TOKEN.indexOf('PASTE') === 0) {
+    throw new Error('Fill in RG_PUBLISHABLE_KEY and RG_TOKEN at the top of the script first.');
   }
-  const res = UrlFetchApp.fetch(SUPABASE_URL + '/rest/v1/rpc/' + fn, {
+  const res = UrlFetchApp.fetch(RG_SUPABASE_URL + '/rest/v1/rpc/' + fn, {
     method: 'post', contentType: 'application/json',
-    headers: { apikey: PUBLISHABLE_KEY },
+    headers: { apikey: RG_PUBLISHABLE_KEY },
     payload: JSON.stringify(body), muteHttpExceptions: true,
   });
   const text = res.getContentText();
@@ -197,5 +200,5 @@ function rpc_(fn, body) {
   return text ? JSON.parse(text) : null;
 }
 
-function toast_(msg) { try { SpreadsheetApp.getActiveSpreadsheet().toast(msg, 'Raidergang', 6); } catch (e) { console.log(msg); } }
-function say_(msg) { try { SpreadsheetApp.getUi().alert(msg); } catch (e) { console.log(msg); } }
+function rgToast_(msg) { try { SpreadsheetApp.getActiveSpreadsheet().toast(msg, 'Raidergang', 6); } catch (e) { console.log(msg); } }
+function rgSay_(msg) { try { SpreadsheetApp.getUi().alert(msg); } catch (e) { console.log(msg); } }
