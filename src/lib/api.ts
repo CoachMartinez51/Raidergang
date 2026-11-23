@@ -236,4 +236,30 @@ function liveApi(sb: SupabaseClient): Api {
   };
 }
 
-export const api: Api = url && key ? liveApi(createClient(url, key)) : demoApi();
+const realApi: Api = url && key ? liveApi(createClient(url, key)) : demoApi();
+
+/**
+ * Coach "Preview as athlete": while on, every write is skipped.
+ * Check-ins and set logs come back looking saved so the screens behave
+ * normally, but nothing reaches the database.
+ */
+let previewing = false;
+export function setPreviewing(on: boolean) { previewing = on; }
+const WRITES = new Set<string>([
+  'signOut', 'addPerson', 'updatePerson', 'createGroup', 'setGroups', 'addGoal', 'saveCheckin',
+  'savePrep', 'assignBlock', 'endAssignment', 'setRehab', 'logSet', 'saveExercise', 'saveDrill',
+  'updateVideo', 'rematchVideos',
+]);
+const fakeSaved = (row: object) => ({
+  id: `preview-${Math.random().toString(36).slice(2)}`, created_at: new Date().toISOString(),
+  recorded_at: new Date().toISOString(), ...row,
+});
+export const api: Api = new Proxy(realApi, {
+  get(target, prop, receiver) {
+    const value = Reflect.get(target, prop, receiver);
+    if (previewing && typeof prop === 'string' && WRITES.has(prop)) {
+      return async (arg?: object) => (prop === 'saveCheckin' || prop === 'logSet') ? fakeSaved(arg ?? {}) : undefined;
+    }
+    return typeof value === 'function' ? value.bind(target) : value;
+  },
+});

@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { api } from '../lib/api';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
+import { api, setPreviewing } from '../lib/api';
+import { AthleteHome } from '../athlete/AthleteHome';
 import { addDays, isoDay, prettyDay } from '../lib/dates';
 import { RPE_FLAG_AT } from '../lib/rpe';
 import { fullName, roleLabels, type Checkin, type Group, type Membership, type Person } from '../lib/types';
@@ -18,6 +19,7 @@ export function CoachHome({ me }: { me: Person }) {
   const [data, setData] = useState<RosterData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<Person | 'new' | null>(null);
+  const [previewAs, setPreviewAs] = useState<Person | null>(null);
 
   const reload = useCallback(async () => {
     try {
@@ -29,6 +31,8 @@ export function CoachHome({ me }: { me: Person }) {
 
   const access = me.is_admin ? 'Admin' : me.coach_can_edit ? 'Coach' : 'Coach · view only';
 
+  if (previewAs) return <AthletePreview person={previewAs} onExit={() => setPreviewAs(null)} />;
+
   return (
     <div className="shell wide">
       <TopBar me={me} sub={`${access}${api.mode === 'demo' ? ' · Demo mode' : ''}`} />
@@ -38,6 +42,15 @@ export function CoachHome({ me }: { me: Person }) {
         <button className={`tab ${tab === 'videos' ? 'on' : ''}`} onClick={() => setTab('videos')}>Videos</button>
         <button className={`tab ${tab === 'roster' ? 'on' : ''}`} onClick={() => setTab('roster')}>Roster</button>
         <button className={`tab ${tab === 'library' ? 'on' : ''}`} onClick={() => setTab('library')}>Library</button>
+        {data && (
+          <select className="input preview-pick" value="" aria-label="Preview as athlete"
+            onChange={e => { const p = data.people.find(x => x.id === e.target.value); if (p) { window.scrollTo(0, 0); setPreviewAs(p); } }}>
+            <option value="">👁 Preview as athlete…</option>
+            {data.people.filter(p => p.active && !p.is_coach)
+              .sort((a, b) => Number(b.is_pitcher) - Number(a.is_pitcher) || a.last_name.localeCompare(b.last_name))
+              .map(p => <option key={p.id} value={p.id}>{fullName(p)}{p.is_pitcher ? '' : ' (position)'}</option>)}
+          </select>
+        )}
       </div>
       <div className="content">
         <ErrorMsg error={error} />
@@ -177,4 +190,16 @@ function Roster({ me, data, onOpen, onAdd }: { me: Person; data: RosterData; onO
       {section('Coaches', coaches)}
     </>
   );
+}
+
+/** Shows a player's home screen exactly as they see it. Writes are switched off while it's open. */
+function AthletePreview({ person, onExit }: { person: Person; onExit: () => void }) {
+  const [ready, setReady] = useState(false);
+  useLayoutEffect(() => {
+    setPreviewing(true);
+    setReady(true);
+    return () => setPreviewing(false);
+  }, []);
+  if (!ready) return null;
+  return <AthleteHome me={person} preview={{ onExit }} />;
 }

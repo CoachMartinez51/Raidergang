@@ -7,11 +7,17 @@ import { GoodsCard } from '../ui/Goods';
 import { LiftToday } from './Lift';
 import { MyVideos } from '../ui/Videos';
 
-export function AthleteHome({ me }: { me: Person }) {
+export function AthleteHome({ me, preview }: { me: Person; preview?: { onExit: () => void } }) {
   const today = isoDay();
   const [version, setVersion] = useState(0);
   return (
     <div className="shell">
+      {preview && (
+        <div className="preview-bar">
+          <span>Previewing as <b>{me.first_name} {me.last_name}</b>. Nothing you tap is saved.</span>
+          <button className="btn small" onClick={preview.onExit}>Exit preview</button>
+        </div>
+      )}
       <TopBar me={me} sub={prettyDay(today, { weekday: 'short', month: 'short', day: 'numeric' })} />
       <div className="content">
         <CheckinCard me={me} day={today} onSaved={() => setVersion(v => v + 1)} />
