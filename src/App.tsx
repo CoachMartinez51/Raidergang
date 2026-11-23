@@ -4,6 +4,40 @@ import type { Person } from './lib/types';
 import { Login, NotInvited } from './ui/Login';
 import { AthleteHome } from './athlete/AthleteHome';
 import { CoachHome } from './coach/CoachHome';
+import { isoDay } from './lib/dates';
+
+/** After this long without a tap, the next visit starts fresh: greeting, today's date, new data. */
+const IDLE_MS = 10 * 60 * 1000;
+
+/** Saves any half-typed field (set inputs save when they lose focus). */
+const blurActive = () => { const el = document.activeElement as HTMLElement | null; el?.blur?.(); };
+
+function useIdleReset(onReset: () => void) {
+  useEffect(() => {
+    let last = Date.now();
+    let day = isoDay();
+    const stale = () => Date.now() - last >= IDLE_MS || isoDay() !== day;
+    const touch = () => {
+      if (stale()) { blurActive(); day = isoDay(); onReset(); }
+      last = Date.now();
+    };
+    const onVis = () => {
+      if (document.visibilityState === 'hidden') blurActive();
+      else touch();
+    };
+    const onFocus = () => touch();
+    document.addEventListener('visibilitychange', onVis);
+    window.addEventListener('focus', onFocus);
+    window.addEventListener('pointerdown', touch, { capture: true });
+    window.addEventListener('keydown', touch, { capture: true });
+    return () => {
+      document.removeEventListener('visibilitychange', onVis);
+      window.removeEventListener('focus', onFocus);
+      window.removeEventListener('pointerdown', touch, { capture: true });
+      window.removeEventListener('keydown', touch, { capture: true });
+    };
+  }, [onReset]);
+}
 
 type State =
   | { kind: 'loading' }
@@ -31,6 +65,7 @@ function Greeting({ name }: { name: string | null }) {
 export default function App() {
   const [state, setState] = useState<State>({ kind: 'loading' });
   const [greeting, setGreeting] = useState(true);   // greeting shows once each time the app opens
+  const [visit, setVisit] = useState(0);            // bumping this rebuilds the home screen from scratch
 
   const refresh = useCallback(async () => {
     try {
@@ -48,6 +83,14 @@ export default function App() {
     refresh();
     return api.onAuthChange(refresh);
   }, [refresh]);
+
+  const freshStart = useCallback(() => {
+    setGreeting(true);
+    setVisit(v => v + 1);
+    window.scrollTo(0, 0);
+    refresh();
+  }, [refresh]);
+  useIdleReset(freshStart);
 
   // keep the greeting up for a moment once we know who it is
   useEffect(() => {
@@ -72,6 +115,6 @@ export default function App() {
       );
     case 'in':
       if (greeting) return <Greeting name={state.me.first_name} />;
-      return state.me.is_coach ? <CoachHome me={state.me} /> : <AthleteHome me={state.me} />;
+      return state.me.is_coach ? <CoachHome key={visit} me={state.me} /> : <AthleteHome key={visit} me={state.me} />;
   }
 }

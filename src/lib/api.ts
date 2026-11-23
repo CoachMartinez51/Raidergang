@@ -1,6 +1,7 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import type { Category, Checkin, GoodsItem, Drill, DrillDraft, Exercise, ExerciseDraft, Goal, GoalKind, Group, Membership, Person, PersonDraft } from './types';
+import type { Category, Checkin, GoodsItem, Drill, DrillDraft, Exercise, ExerciseDraft, Goal, GoalKind, Group, LibrarySync, Membership, Person, PersonDraft, Video, VideoPatch } from './types';
 import { demoApi } from './demo';
+import { addDays, isoDay } from './dates';
 import type { Assignment, BlockDay, LiftBlock, LiftPrep, PrepItem, RehabSwitch, SetLog } from './lifts';
 
 export interface Api {
@@ -47,6 +48,12 @@ export interface Api {
   saveExercise(id: string | null, e: ExerciseDraft): Promise<Exercise>;
   listDrills(): Promise<Drill[]>;
   saveDrill(id: string | null, d: DrillDraft): Promise<Drill>;
+  lastLibrarySync(): Promise<LibrarySync | null>;
+
+  /** personId = one athlete; null = everything a coach can see */
+  listVideos(personId: string | null): Promise<Video[]>;
+  updateVideo(id: string, patch: VideoPatch): Promise<void>;
+  rematchVideos(): Promise<number>;
 }
 
 const cleanName = (msg: string) => /duplicate|unique/i.test(msg) ? 'Something with that name is already in the library.' : msg;
@@ -126,7 +133,7 @@ function liveApi(sb: SupabaseClient): Api {
       return must(await sb.from('current_checkins').select('*').eq('checkin_date', day)) as Checkin[];
     },
     async checkinHistory(personId, days) {
-      const since = new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
+      const since = addDays(isoDay(), -days);
       return must(await sb.from('current_checkins').select('*').eq('person_id', personId)
         .gte('checkin_date', since).order('checkin_date', { ascending: false })) as Checkin[];
     },
@@ -211,6 +218,21 @@ function liveApi(sb: SupabaseClient): Api {
       if (r.error) throw new Error(cleanName(r.error.message));
       return r.data as Drill;
     },
+    async lastLibrarySync() {
+      const rows = must(await sb.from('library_sync_log').select('*').order('ran_at', { ascending: false }).limit(1)) as LibrarySync[];
+      return rows[0] ?? null;
+    },
+
+    async listVideos(personId) {
+      let q = sb.from('videos').select('id,youtube_id,title,published_at,recorded_on,video_type,person_id,match_status,match_note');
+      if (personId) q = q.eq('person_id', personId).in('match_status', ['auto', 'manual']);
+      return must(await q.order('recorded_on', { ascending: false }).order('published_at', { ascending: false }).range(0, 1999)) as Video[];
+    },
+    async updateVideo(id, patch) {
+      const rows = must(await sb.from('videos').update(patch).eq('id', id).select('id')) as { id: string }[];
+      if (!rows.length) throw new Error('You do not have permission to change that video.');
+    },
+    async rematchVideos() { return must(await sb.rpc('rematch_videos')) as number; },
   };
 }
 

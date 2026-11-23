@@ -108,3 +108,25 @@ export const GOODS_LABELS: Record<GoodsSection, string> = {
   soft_tissue: 'Soft tissue', correctives: 'Correctives', feels: 'Feels (pre-throw)',
   half_plyos: 'Half plyos', full_plyos: 'Full plyos',
 };
+
+export type VideoStatus = 'auto' | 'manual' | 'unmatched' | 'ignored';
+export interface Video {
+  id: string;
+  youtube_id: string;
+  title: string;
+  published_at: string | null;
+  recorded_on: string | null;   // YYYY-MM-DD
+  video_type: string | null;
+  person_id: string | null;
+  match_status: VideoStatus;
+  match_note: string | null;
+}
+export type VideoPatch = Partial<Pick<Video, 'person_id' | 'match_status' | 'video_type' | 'recorded_on'>>;
+
+export interface LibrarySync {
+  ran_at: string;
+  ex_in_sheet: number; ex_added: number; ex_updated: number;
+  drills_in_sheet: number; drills_added: number; drills_updated: number;
+  app_only: number;
+  skipped: { tab: string; name: string; why: string }[];
+}

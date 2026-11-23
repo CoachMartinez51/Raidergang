@@ -204,5 +204,17 @@ export function demoApi(): Api & { signInAs(email: string): void; demoAccounts()
       if (row) Object.assign(row, dr); else { row = { ...dr, id: uid() }; list.push(row); }
       save(d); return row;
     },
+    async lastLibrarySync() { return null; },
+    async listVideos(personId) {
+      const p = personId ? load().people.find(x => x.id === personId) : null;
+      if (personId && !p?.is_pitcher) return [];
+      const someone = personId ?? load().people.find(x => x.is_pitcher)?.id ?? null;
+      return [
+        { id: 'v1', youtube_id: 'dQw4w9WgXcQ', title: 'Demo Bullpen 11/20', published_at: null, recorded_on: addDays(isoDay(), -3), video_type: 'Bullpen', person_id: someone, match_status: 'auto', match_note: null },
+        ...(personId ? [] : [{ id: 'v2', youtube_id: 'dQw4w9WgXcQ', title: 'Bullpen 11/19', published_at: null, recorded_on: addDays(isoDay(), -4), video_type: 'Bullpen', person_id: null, match_status: 'unmatched' as const, match_note: 'No athlete name found in the title' }]),
+      ];
+    },
+    async updateVideo() { /* demo: nothing saved */ },
+    async rematchVideos() { return 0; },
   };
 }

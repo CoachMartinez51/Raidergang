@@ -5,6 +5,7 @@ import type { Checkin, Goal, GoalKind, Person } from '../lib/types';
 import { ErrorMsg, RpeBadge, RpePicker, TopBar } from '../ui/common';
 import { GoodsCard } from '../ui/Goods';
 import { LiftToday } from './Lift';
+import { MyVideos } from '../ui/Videos';
 
 export function AthleteHome({ me }: { me: Person }) {
   const today = isoDay();
@@ -19,6 +20,7 @@ export function AthleteHome({ me }: { me: Person }) {
         {me.is_pitcher && <GoodsCard personId={me.id} />}
         <LiftToday me={me} />
         <RecentCheckins key={version} me={me} />
+        <MyVideos personId={me.id} />
       </div>
     </div>
   );
@@ -117,11 +119,11 @@ function Objectives({ me }: { me: Person }) {
 
 function RecentCheckins({ me }: { me: Person }) {
   const [rows, setRows] = useState<Checkin[]>([]);
-  useEffect(() => { api.checkinHistory(me.id, 30).then(setRows).catch(() => {}); }, [me.id]);
+  useEffect(() => { api.checkinHistory(me.id, 6).then(setRows).catch(() => {}); }, [me.id]);
   if (!rows.length) return null;
   return (
     <>
-      <div className="section-title">Last 30 days</div>
+      <div className="section-title">This past week</div>
       <div className="card" style={{ gap: 8 }}>
         {rows.map(c => (
           <div className="row small" key={c.id}>

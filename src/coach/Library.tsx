@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../lib/api';
-import { DRILL_TYPES, type Category, type Drill, type DrillDraft, type Exercise, type ExerciseDraft, type Person } from '../lib/types';
+import { DRILL_TYPES, type LibrarySync, type Category, type Drill, type DrillDraft, type Exercise, type ExerciseDraft, type Person } from '../lib/types';
 import { ErrorMsg } from '../ui/common';
 
 type Kind = 'exercises' | 'drills';
@@ -67,6 +67,7 @@ export function Library({ me }: { me: Person }) {
         <button className={`toggle ${cat === 'all' ? 'on' : ''}`} onClick={() => setCat('all')}>All</button>
         {chips.map(c => <button key={c} className={`toggle ${cat === c ? 'on' : ''}`} onClick={() => setCat(c)}>{c}</button>)}
       </div>
+      <SyncStatus />
       <ErrorMsg error={error} />
       <span className="small muted">{total} shown</span>
 
@@ -240,5 +241,37 @@ function DrillEditor({ me, item, onClose, onSaved }: { me: Person; item: Drill |
       <ErrorMsg error={error} />
       {!ro && <button className="btn" disabled={!valid || busy} onClick={save}>{busy ? 'Saving…' : item ? 'Save changes' : 'Add to library'}</button>}
     </Drawer>
+  );
+}
+
+const ago = (iso: string) => {
+  const m = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+  if (m < 1) return 'just now';
+  if (m < 60) return `${m} min ago`;
+  const h = Math.round(m / 60);
+  return h < 48 ? `${h} hr ago` : new Date(iso).toLocaleDateString();
+};
+
+/** The Coaching Database is the master copy; this shows the last time it was sent to the app. */
+function SyncStatus() {
+  const [s, setS] = useState<LibrarySync | null | undefined>(undefined);
+  const [more, setMore] = useState(false);
+  useEffect(() => { api.lastLibrarySync().then(setS).catch(() => setS(null)); }, []);
+  if (s === undefined || api.mode === 'demo') return null;
+  return (
+    <div className="msg" style={{ background: 'var(--card)', border: '1px solid var(--line)', display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <span>
+        <b>Master copy: the Coaching Database sheet.</b>{' '}
+        {s ? <>Last synced {ago(s.ran_at)}: {s.ex_added} new, {s.ex_updated} updated{s.drills_added + s.drills_updated ? `, ${s.drills_added + s.drills_updated} drill change${s.drills_added + s.drills_updated === 1 ? '' : 's'}` : ''}.</> : <>Not synced yet. Turn on the Raidergang script in the sheet.</>}
+      </span>
+      <span className="muted">Add or change exercises in the sheet. Edits made here get replaced on the next sync (about every 15 minutes).</span>
+      {s && s.skipped.length > 0 && (
+        <>
+          <button className="link" style={{ alignSelf: 'flex-start', padding: 0 }} onClick={() => setMore(m => !m)}>{s.skipped.length} row{s.skipped.length === 1 ? '' : 's'} in the sheet need a look</button>
+          {more && s.skipped.map((k, i) => <span key={i} className="muted">{k.tab}: <b>{k.name}</b> ({k.why})</span>)}
+        </>
+      )}
+      {s && s.app_only > 0 && <span className="muted">{s.app_only} exercise{s.app_only === 1 ? ' is' : 's are'} in the app but not the sheet (kept as is).</span>}
+    </div>
   );
 }
