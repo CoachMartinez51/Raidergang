@@ -1,3 +1,4 @@
+import { computeSessions, type SprintResult } from './sprints';
 // Demo mode: runs entirely in the browser with sample data, used until the
 // app is connected to Supabase. Nothing here leaves the device.
 import type { Api } from './api';
@@ -11,7 +12,7 @@ const now = () => new Date().toISOString();
 
 interface Db { people: Person[]; groups: Group[]; members: Membership[]; goals: Goal[]; checkins: Checkin[]; session: string | null;
   categories?: Category[]; exercises?: Exercise[]; drills?: Drill[];
-  assignments?: Assignment[]; rehab?: RehabSwitch[]; setLogs?: SetLog[]; }
+  assignments?: Assignment[]; rehab?: RehabSwitch[]; setLogs?: SetLog[]; sprints?: SprintResult[]; }
 
 let blocksCache: LiftBlock[] | null = null;
 async function demoBlocks(): Promise<LiftBlock[]> {
@@ -216,5 +217,46 @@ export function demoApi(): Api & { signInAs(email: string): void; demoAccounts()
     },
     async updateVideo() { /* demo: nothing saved */ },
     async rematchVideos() { return 0; },
+    async sprintResults(personId) {
+      const d = sprintDb();
+      return d.sprints!.filter(r => !r.retired_at && (!personId || r.person_id === personId));
+    },
+    async logSprint(r) {
+      const d = sprintDb();
+      const row: SprintResult = { id: uid(), session_label: null, retired_at: null, created_at: now(), source: 'app', ...r };
+      d.sprints!.push(row); save(d); return row;
+    },
+    async removeSprint(id) {
+      const d = sprintDb(); const row = d.sprints!.find(r => r.id === id); if (row) { row.retired_at = now(); save(d); }
+    },
+    async sprintHistory(personId) {
+      const d = sprintDb();
+      const pitch = new Map(d.people.filter(p => !p.is_coach && p.active).map(p => [p.id, p.is_pitcher]));
+      return computeSessions(d.sprints!, id => pitch.get(id) ?? null).filter(s => s.person_id === personId);
+    },
+    async sprintBoard() {
+      const d = sprintDb();
+      const pitch = new Map(d.people.filter(p => !p.is_coach && p.active).map(p => [p.id, p.is_pitcher]));
+      return computeSessions(d.sprints!, id => pitch.get(id) ?? null);
+    },
   };
+}
+
+/** A little fake fall history so the demo shows PRs and medals. */
+function demoSprints(people: Person[]): SprintResult[] {
+  const out: SprintResult[] = [];
+  const runners = people.filter(p => !p.is_coach && p.active);
+  const base: Record<string, number> = { '5/10': 1.26, '10/10': 1.13, '15/10': 1.07, '20/10': 1.04 };
+  const weeks = [[1, '5/10'], [2, '10/10'], [3, '15/10'], [4, '20/10'], [5, '5/10'], [6, '10/10']] as const;
+  runners.forEach((p, i) => weeks.forEach(([w, s]) => out.push({
+    id: uid(), person_id: p.id, sprint: s, run_date: addDays('2026-09-07', (w - 1) * 7), session_label: `Fall Wk ${w}`,
+    seconds: Math.round((base[s] + ((i * 7 + w * 3) % 9) / 100) * 100) / 100, source: 'sheet', retired_at: null, created_at: now(),
+  })));
+  return out;
+}
+
+function sprintDb(): Db {
+  const d = load();
+  if (!d.sprints) { d.sprints = demoSprints(d.people); save(d); }
+  return d;
 }

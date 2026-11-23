@@ -2,6 +2,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { Category, Checkin, GoodsItem, Drill, DrillDraft, Exercise, ExerciseDraft, Goal, GoalKind, Group, LibrarySync, Membership, Person, PersonDraft, Video, VideoPatch } from './types';
 import { demoApi } from './demo';
 import { addDays, isoDay } from './dates';
+import type { SprintResult, SprintSession, SprintType } from './sprints';
 import type { Assignment, BlockDay, LiftBlock, LiftPrep, PrepItem, RehabSwitch, SetLog } from './lifts';
 
 export interface Api {
@@ -54,6 +55,14 @@ export interface Api {
   listVideos(personId: string | null): Promise<Video[]>;
   updateVideo(id: string, patch: VideoPatch): Promise<void>;
   rematchVideos(): Promise<number>;
+
+  /** Raw times (not removed). personId null = everyone a coach can see. */
+  sprintResults(personId: string | null): Promise<SprintResult[]>;
+  logSprint(r: { person_id: string; sprint: SprintType; run_date: string; seconds: number; source?: 'app' | 'coach' }): Promise<SprintResult>;
+  removeSprint(id: string): Promise<void>;
+  /** Best per testing week with medals: one athlete, or the whole team for coaches. */
+  sprintHistory(personId: string): Promise<SprintSession[]>;
+  sprintBoard(): Promise<SprintSession[]>;
 }
 
 const cleanName = (msg: string) => /duplicate|unique/i.test(msg) ? 'Something with that name is already in the library.' : msg;
@@ -233,6 +242,21 @@ function liveApi(sb: SupabaseClient): Api {
       if (!rows.length) throw new Error('You do not have permission to change that video.');
     },
     async rematchVideos() { return must(await sb.rpc('rematch_videos')) as number; },
+
+    async sprintResults(personId) {
+      let q = sb.from('sprint_results').select('*').is('retired_at', null);
+      if (personId) q = q.eq('person_id', personId);
+      return must(await q.order('run_date', { ascending: false }).range(0, 9999)) as SprintResult[];
+    },
+    async logSprint(r) {
+      return must(await sb.from('sprint_results').insert({ source: 'app', ...r }).select().single()) as SprintResult;
+    },
+    async removeSprint(id) {
+      const rows = must(await sb.from('sprint_results').update({ retired_at: new Date().toISOString() }).eq('id', id).select('id')) as { id: string }[];
+      if (!rows.length) throw new Error('That time could not be removed.');
+    },
+    async sprintHistory(personId) { return must(await sb.rpc('sprint_history', { p_person: personId })) as SprintSession[]; },
+    async sprintBoard() { return must(await sb.rpc('sprint_board')) as SprintSession[]; },
   };
 }
 
@@ -248,7 +272,7 @@ export function setPreviewing(on: boolean) { previewing = on; }
 const WRITES = new Set<string>([
   'signOut', 'addPerson', 'updatePerson', 'createGroup', 'setGroups', 'addGoal', 'saveCheckin',
   'savePrep', 'assignBlock', 'endAssignment', 'setRehab', 'logSet', 'saveExercise', 'saveDrill',
-  'updateVideo', 'rematchVideos',
+  'updateVideo', 'rematchVideos', 'logSprint', 'removeSprint',
 ]);
 const fakeSaved = (row: object) => ({
   id: `preview-${Math.random().toString(36).slice(2)}`, created_at: new Date().toISOString(),
@@ -258,7 +282,7 @@ export const api: Api = new Proxy(realApi, {
   get(target, prop, receiver) {
     const value = Reflect.get(target, prop, receiver);
     if (previewing && typeof prop === 'string' && WRITES.has(prop)) {
-      return async (arg?: object) => (prop === 'saveCheckin' || prop === 'logSet') ? fakeSaved(arg ?? {}) : undefined;
+      return async (arg?: object) => (prop === 'saveCheckin' || prop === 'logSet' || prop === 'logSprint') ? fakeSaved({ retired_at: null, ...(arg ?? {}) }) : undefined;
     }
     return typeof value === 'function' ? value.bind(target) : value;
   },

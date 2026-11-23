@@ -49,15 +49,32 @@ type State =
 const NAME_KEY = 'raidergang-first-name';
 const savedName = () => { try { return localStorage.getItem(NAME_KEY); } catch { return null; } };
 
+/** Loading-screen lines; one is picked at random each time the app opens. {name} = first name. */
+const GREETINGS = [
+  "What's up {name}, attack the day.",
+  '{name}! Whatz Up Whatz Up!',
+  'Hum Now {name}!',
+  "Let's get after it {name}!",
+  'Ohhh yeahhhh {name}',
+  'IYAAR…',
+  'One pitch at a time.',
+  'Philippians 2:3',
+];
+
 function Greeting({ name }: { name: string | null }) {
+  const [line] = useState(() => {
+    const options = name ? GREETINGS : GREETINGS.filter(g => !g.includes('{name}'));
+    return options[Math.floor(Math.random() * options.length)];
+  });
+  const parts = line.split('{name}');
   return (
     <div className="center greet">
       <img src="/raidergang-logo.png" alt="Raidergang · Wright State Baseball" style={{ width: 240, maxWidth: '75%' }} />
-      {name && (
-        <div style={{ fontFamily: "'Space Grotesk', Inter, sans-serif", fontSize: 24, fontWeight: 700, lineHeight: 1.3 }}>
-          What's up <span style={{ color: 'var(--gold)' }}>{name}</span>,<br />attack the day.
-        </div>
-      )}
+      <div style={{ fontFamily: "'Space Grotesk', Inter, sans-serif", fontSize: 24, fontWeight: 700, lineHeight: 1.3, textAlign: 'center', padding: '0 20px' }}>
+        {parts.map((p, i) => (
+          <span key={i}>{p}{i < parts.length - 1 && <span style={{ color: 'var(--gold)' }}>{name}</span>}</span>
+        ))}
+      </div>
     </div>
   );
 }

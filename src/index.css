@@ -123,3 +123,9 @@ select.input option { background: var(--card); }
   padding: 10px 14px; background: var(--gold); color: #111; font-size: 14px; }
 .preview-bar .btn { background: #111; color: var(--gold); border-color: #111; flex-shrink: 0; }
 .preview-pick { margin-left: auto; max-width: 230px; height: 36px; font-size: 13px; }
+
+.sprint-prs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+@media (max-width: 480px) { .sprint-prs { grid-template-columns: repeat(2, 1fr); } }
+.sprint-pr { display: flex; flex-direction: column; gap: 2px; padding: 10px; border: 1px solid var(--line); border-radius: 10px; cursor: pointer; }
+.sprint-pr.on { border-color: var(--gold); }
+.sprint-pr .pr-time { font-family: 'Space Grotesk', Inter, sans-serif; font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; }

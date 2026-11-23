@@ -6,6 +6,7 @@ import { ErrorMsg, RpeBadge, RpePicker, TopBar } from '../ui/common';
 import { GoodsCard } from '../ui/Goods';
 import { LiftToday } from './Lift';
 import { MyVideos } from '../ui/Videos';
+import { SprintCard } from '../ui/Sprints';
 
 export function AthleteHome({ me, preview }: { me: Person; preview?: { onExit: () => void } }) {
   const today = isoDay();
@@ -25,6 +26,7 @@ export function AthleteHome({ me, preview }: { me: Person; preview?: { onExit: (
         <div className="section-title">Today's agenda</div>
         {me.is_pitcher && <GoodsCard personId={me.id} />}
         <LiftToday me={me} />
+        <SprintCard me={me} />
         <RecentCheckins key={version} me={me} />
         <MyVideos personId={me.id} />
       </div>
