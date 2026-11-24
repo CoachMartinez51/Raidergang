@@ -38,6 +38,7 @@ export function ThrowingTab({ me, goods }: { me: Person; goods: ReactNode }) {
   const [days, setDays] = useState<Map<string, ThrowDay>>(new Map());
   const [err, setErr] = useState<string | null>(null);
   const velo = me.throw_velo != null ? Number(me.throw_velo) : null;
+  const pro = !!me.is_individual_pro;
 
   // Load the shown month plus this week (which can straddle months).
   const from = useMemo(() => [mondayOf(today), mondayOf(month)].sort()[0], [today, month]);
@@ -63,10 +64,10 @@ export function ThrowingTab({ me, goods }: { me: Person; goods: ReactNode }) {
   const week = Array.from({ length: 7 }, (_, i) => addDays(mondayOf(today), i));
   return (
     <>
-      <div className="row"><span className="small muted">Winter Arm Build-Up</span><span className="pill-soft gold">{program.name}</span></div>
-      <DayHero d={d} date={sel} today={today} />
+      <div className="row"><span className="small muted">{pro ? "Your throwing program" : "Winter Arm Build-Up"}</span><span className="pill-soft gold">{program.name}</span></div>
+      <DayHero d={d} date={sel} today={today} pro={pro} />
       {sel === today && <div id="goods" className="anchor">{goods}</div>}
-      {d && d.kind !== 'Off' && d.kind !== 'Recovery' && <DayDetail d={d} velo={velo} goPreThrow={goPreThrow} />}
+      {d && d.kind !== 'Off' && d.kind !== 'Recovery' && <DayDetail d={d} velo={velo} goPreThrow={goPreThrow} pro={pro} />}
       {d && d.kind !== 'Off' && sel <= today && <ThrowLogCard me={me} d={d} />}
 
       <div className="card" style={{ gap: 10 }}>
@@ -75,22 +76,22 @@ export function ThrowingTab({ me, goods }: { me: Person; goods: ReactNode }) {
           {week.map((iso, i) => {
             const x = days.get(iso);
             return (
-              <button key={iso} className={`throw-wd ${x ? dayCls(x) : 'k-none'} ${iso === sel ? 'sel' : ''}`} onClick={() => setSel(iso)}
+              <button key={iso} className={`throw-wd ${x ? dayCls(x, pro) : 'k-none'} ${iso === sel ? 'sel' : ''}`} onClick={() => setSel(iso)}
                 aria-label={`${WD[i]} ${prettyDay(iso)}: ${x ? x.title : 'nothing planned'}`}>
                 <span className="wd">{WD[i]}</span><span className="dn">{Number(iso.slice(8))}</span><span className="lab">{x ? shortTitle(x) : '–'}</span>
               </button>
             );
           })}
         </div>
-        <Legend intensity={showIntensity(week[0]) || showIntensity(week[6])} />
+        <Legend intensity={showIntensity(week[0], pro) || showIntensity(week[6], pro)} />
         <button className="btn ghost small" style={{ alignSelf: 'flex-start' }} aria-expanded={showMonth} onClick={() => setShowMonth(v => !v)}>
           {showMonth ? 'Hide full calendar' : 'Full calendar'}
         </button>
       </div>
-      {showMonth && <MonthCard month={month} days={days} sel={sel} today={today} onPick={setSel}
+      {showMonth && <MonthCard pro={pro} month={month} days={days} sel={sel} today={today} onPick={setSel}
         onPrev={() => setMonth(m => shiftMonth(m, -1))} onNext={() => setMonth(m => shiftMonth(m, 1))} />}
 
-      {today >= INTENSITY_FROM && <div className="card" style={{ gap: 4 }}>
+      {(pro || today >= INTENSITY_FROM) && <div className="card" style={{ gap: 4 }}>
         <div className="row"><h2>What is MY intensity?</h2><span className="small muted">{velo ? `Avg fastball ${velo} mph` : ''}</span></div>
         {velo ? CALC_ROWS.map(r => (
           <div key={r.label} className="kv"><span>{r.label} · {intensityText(r.kind)}</span><b>{mphText(r.kind, velo)}</b></div>
@@ -101,12 +102,12 @@ export function ThrowingTab({ me, goods }: { me: Person; goods: ReactNode }) {
   );
 }
 
-function DayHero({ d, date, today }: { d: ThrowDay | null; date: string; today: string }) {
+function DayHero({ d, date, today, pro }: { d: ThrowDay | null; date: string; today: string; pro: boolean }) {
   const when = `${date === today ? 'TODAY · ' : ''}${prettyDay(date, { weekday: 'short', month: 'short', day: 'numeric' }).toUpperCase()}`;
   if (!d) return <div className="throw-hero k-none"><div className="eyebrow">{when}</div><div className="t">Nothing planned</div></div>;
   return (
-    <div className={`throw-hero ${dayCls(d)}`}>
-      <div className="row"><span className="eyebrow">{when}</span><span className={`kchip ${dayCls(d)}`}>{dayChip(d)}</span></div>
+    <div className={`throw-hero ${dayCls(d, pro)}`}>
+      <div className="row"><span className="eyebrow">{when}</span><span className={`kchip ${dayCls(d, pro)}`}>{dayChip(d, pro)}</span></div>
       <div className="t">{d.sp_title && d.sp_title !== d.title ? 'Live outing' : d.title}</div>
       {d.sp_title && d.sp_title !== d.title && (
         <div className="roles"><div><b>Relievers:</b> {d.title.replace(/^RP:\s*/i, '')}</div><div><b>Starters:</b> {d.sp_title.replace(/^SP:\s*/i, '')}</div></div>
@@ -116,9 +117,9 @@ function DayHero({ d, date, today }: { d: ThrowDay | null; date: string; today: 
   );
 }
 
-function DayDetail({ d, velo, goPreThrow }: { d: ThrowDay; velo: number | null; goPreThrow: () => void }) {
-  const it = showIntensity(d.day) ? intensityText(d.kind) : null;
-  const mph = showIntensity(d.day) ? mphText(d.kind, velo) : null;
+function DayDetail({ d, velo, goPreThrow, pro }: { d: ThrowDay; velo: number | null; goPreThrow: () => void; pro: boolean }) {
+  const it = showIntensity(d.day, pro) ? intensityText(d.kind) : null;
+  const mph = showIntensity(d.day, pro) ? mphText(d.kind, velo) : null;
   return (
     <div className="card" style={{ gap: 0 }}>
       <h2 style={{ marginBottom: 4 }}>Your throw</h2>
@@ -141,8 +142,8 @@ function Legend({ intensity }: { intensity: boolean }) {
   );
 }
 
-function MonthCard({ month, days, sel, today, onPick, onPrev, onNext }: {
-  month: string; days: Map<string, ThrowDay>; sel: string; today: string;
+function MonthCard({ pro, month, days, sel, today, onPick, onPrev, onNext }: {
+  pro: boolean; month: string; days: Map<string, ThrowDay>; sel: string; today: string;
   onPick: (iso: string) => void; onPrev: () => void; onNext: () => void;
 }) {
   const first = month;
@@ -163,7 +164,7 @@ function MonthCard({ month, days, sel, today, onPick, onPrev, onNext }: {
           if (!iso) return <span key={i} />;
           const x = days.get(iso);
           return (
-            <button key={iso} className={`md ${x ? dayCls(x) : 'k-none'} ${iso === sel ? 'sel' : ''} ${iso === today ? 'today' : ''}`}
+            <button key={iso} className={`md ${x ? dayCls(x, pro) : 'k-none'} ${iso === sel ? 'sel' : ''} ${iso === today ? 'today' : ''}`}
               aria-label={`${prettyDay(iso)}: ${x ? x.title : 'nothing planned'}`} onClick={() => { onPick(iso); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>
               {Number(iso.slice(8))}
             </button>

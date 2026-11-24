@@ -67,16 +67,17 @@ export function shortTitle(d: ThrowDay) {
   return d.title.slice(0, 10);
 }
 
-/** Before this date days aren't classified by intent: athletes see distance + plyos only. */
+/** Before this date days aren't classified by intent: athletes see distance + plyos only.
+ *  Individuals / professionals always see Low / Medium / High. */
 export const INTENSITY_FROM = '2027-01-11';
-export const showIntensity = (day: string) => day >= INTENSITY_FROM;
+export const showIntensity = (day: string, pro = false) => pro || day >= INTENSITY_FROM;
 /** Color class for a day: Off / Recovery keep theirs; throwing days are neutral until intensities start. */
-export function dayCls(d: Pick<ThrowDay, 'day' | 'kind'>) {
-  if (showIntensity(d.day) || d.kind === 'Off' || d.kind === 'Recovery') return KINDS[d.kind].cls;
+export function dayCls(d: Pick<ThrowDay, 'day' | 'kind'>, pro = false) {
+  if (showIntensity(d.day, pro) || d.kind === 'Off' || d.kind === 'Recovery') return KINDS[d.kind].cls;
   return 'k-throw';
 }
-export function dayChip(d: Pick<ThrowDay, 'day' | 'kind'>) {
-  if (showIntensity(d.day) || d.kind === 'Off' || d.kind === 'Recovery') return KINDS[d.kind].label;
+export function dayChip(d: Pick<ThrowDay, 'day' | 'kind'>, pro = false) {
+  if (showIntensity(d.day, pro) || d.kind === 'Off' || d.kind === 'Recovery') return KINDS[d.kind].label;
   return 'Throw';
 }
 

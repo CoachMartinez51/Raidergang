@@ -36,6 +36,11 @@ export function Throwing({ me, data }: { me: Person; data: RosterData }) {
   if (!programs) return <div className="muted small">Loading…</div>;
 
   const count = (id: string) => assign.filter(a => a.program_id === id).length;
+  const isPro = (id: string | null) => {
+    const on = assign.filter(a => a.program_id === id).map(a => data.people.find(p => p.id === a.person_id));
+    return on.length > 0 && on.every(p => p?.is_individual_pro);
+  };
+  const pro = isPro(pid);
   const program = programs.find(p => p.id === pid) ?? null;
 
   const copy = async () => {
@@ -85,10 +90,10 @@ export function Throwing({ me, data }: { me: Person; data: RosterData }) {
               {Array.from({ length: WEEKS * 7 }, (_, i) => addDays(start, i)).map(iso => {
                 const d = days.get(iso);
                 return (
-                  <button key={iso} className={`tcell ${d ? dayCls(d) : 'k-none'} ${iso === sel ? 'sel' : ''}`} onClick={() => setSel(iso)}>
-                    <span className="tc-top"><b>{prettyDay(iso, { month: 'numeric', day: 'numeric' })}</b>{d && <span>{dayChip(d)}</span>}</span>
+                  <button key={iso} className={`tcell ${d ? dayCls(d, pro) : 'k-none'} ${iso === sel ? 'sel' : ''}`} onClick={() => setSel(iso)}>
+                    <span className="tc-top"><b>{prettyDay(iso, { month: 'numeric', day: 'numeric' })}</b>{d && <span>{dayChip(d, pro)}</span>}</span>
                     <span className="tc-title">{d ? (d.sp_title && d.sp_title !== d.title ? 'Live (RP / SP)' : d.title) : '—'}</span>
-                    {d && (d.distance || d.catch_play) && <span className="tc-sub">{[d.distance, d.kind !== 'Off' && showIntensity(d.day) ? intensityText(d.kind) : null].filter(Boolean).join(' · ')}</span>}
+                    {d && (d.distance || d.catch_play) && <span className="tc-sub">{[d.distance, d.kind !== 'Off' && showIntensity(d.day, pro) ? intensityText(d.kind) : null].filter(Boolean).join(' · ')}</span>}
                     {d && d.plyos !== 'none' && <span className="tc-ply">{PLYO_LABEL[d.plyos]}</span>}
                   </button>
                 );
@@ -97,7 +102,7 @@ export function Throwing({ me, data }: { me: Person; data: RosterData }) {
           </div>
 
           {sel && program && (
-            <DayEditor key={`${program.id}|${sel}`} ro={ro} program={program} date={sel} day={days.get(sel) ?? null}
+            <DayEditor key={`${program.id}|${sel}`} pro={pro} ro={ro} program={program} date={sel} day={days.get(sel) ?? null}
               onSaved={d => setDays(m => new Map(m).set(d.day, d))} onClose={() => setSel(null)} />
           )}
           <DayTypes />
@@ -107,8 +112,8 @@ export function Throwing({ me, data }: { me: Person; data: RosterData }) {
   );
 }
 
-export function DayEditor({ ro, program, date, day, onSaved, onClose }: {
-  ro: boolean; program: ThrowProgram; date: string; day: ThrowDay | null; onSaved: (d: ThrowDay) => void; onClose: () => void;
+export function DayEditor({ pro = false, ro, program, date, day, onSaved, onClose }: {
+  pro?: boolean; ro: boolean; program: ThrowProgram; date: string; day: ThrowDay | null; onSaved: (d: ThrowDay) => void; onClose: () => void;
 }) {
   const blank: ThrowDayDraft = { kind: 'Off', title: 'Off', sp_title: null, distance: null, catch_play: null, plyos: 'none', note: null };
   const [d, setD] = useState<ThrowDayDraft>(() => day ? { kind: day.kind, title: day.title, sp_title: day.sp_title, distance: day.distance, catch_play: day.catch_play, plyos: day.plyos, note: day.note } : blank);
@@ -173,7 +178,7 @@ export function DayEditor({ ro, program, date, day, onSaved, onClose }: {
       <label className="field">Note
         <textarea className="input" rows={2} disabled={ro} maxLength={500} value={d.note ?? ''} onChange={e => set('note', e.target.value)} />
       </label>
-      <div className="small muted">{showIntensity(date)
+      <div className="small muted">{showIntensity(date, pro)
         ? `Intensity for this type: ${intensityText(d.kind) ?? 'none'} of each pitcher's average fastball. Athletes see their own mph.`
         : `Before ${prettyDay(INTENSITY_FROM, { month: 'short', day: 'numeric' })} athletes only see the title, distance, catch play and plyos (no intensity). The type still sets plyos and Off days.`}</div>
       <ErrorMsg error={error} />
@@ -343,14 +348,14 @@ export function PlayerThrowing({ me, person }: { me: Person; person: Person }) {
             {Array.from({ length: 14 }, (_, i) => addDays(start, i)).map(iso => {
               const d = days.get(iso);
               return (
-                <button key={iso} className={`pt-cell ${d ? dayCls(d) : 'k-none'} ${iso === sel ? 'sel' : ''} ${iso === isoDay() ? 'today' : ''}`} onClick={() => setSel(iso)}
+                <button key={iso} className={`pt-cell ${d ? dayCls(d, !!person.is_individual_pro) : 'k-none'} ${iso === sel ? 'sel' : ''} ${iso === isoDay() ? 'today' : ''}`} onClick={() => setSel(iso)}
                   aria-label={`${prettyDay(iso)}: ${d ? d.title : 'nothing planned'}`}>
                   <b>{Number(iso.slice(8))}</b><span>{d ? shortTitle(d) : '–'}</span>
                 </button>
               );
             })}
           </div>
-          {sel && <DayEditor key={`${program.id}|${sel}`} ro={ro} program={program} date={sel} day={days.get(sel) ?? null}
+          {sel && <DayEditor key={`${program.id}|${sel}`} pro={!!person.is_individual_pro} ro={ro} program={program} date={sel} day={days.get(sel) ?? null}
             onSaved={d => setDays(m => new Map(m).set(d.day, d))} onClose={() => setSel(null)} />}
         </>
       )}
