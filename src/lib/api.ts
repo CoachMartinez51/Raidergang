@@ -2,7 +2,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { Category, Checkin, GoodsItem, Drill, DrillDraft, Exercise, ExerciseDraft, Goal, GoalKind, Group, LibrarySync, Membership, Person, PersonDraft, Video, VideoPatch } from './types';
 import { demoApi } from './demo';
 import { addDays, isoDay } from './dates';
-import type { SprintResult, SprintSession, SprintType } from './sprints';
+import type { SprintResult, SprintSession, SprintType, SpotlightRow } from './sprints';
 import type { BlockDayPatch, BlockExercisePatch, NewBlockExercise } from './lifts';
 import type { Assignment, BlockDay, LiftBlock, LiftPrep, PrepItem, RehabSwitch, SetLog } from './lifts';
 
@@ -70,6 +70,8 @@ export interface Api {
   /** Best per testing week with medals: one athlete, or the whole team for coaches. */
   sprintHistory(personId: string): Promise<SprintSession[]>;
   sprintBoard(): Promise<SprintSession[]>;
+  /** The Medalists + Most Improved for the latest testing week (whole team can see). */
+  sprintSpotlight(): Promise<SpotlightRow[]>;
 }
 
 const cleanName = (msg: string) => /duplicate|unique/i.test(msg) ? 'Something with that name is already in the library.' : msg;
@@ -279,6 +281,9 @@ function liveApi(sb: SupabaseClient): Api {
     },
     async sprintHistory(personId) { return must(await sb.rpc('sprint_history', { p_person: personId })) as SprintSession[]; },
     async sprintBoard() { return must(await sb.rpc('sprint_board')) as SprintSession[]; },
+    async sprintSpotlight() {
+      return (must(await sb.rpc('sprint_spotlight')) as SpotlightRow[]).map(r => ({ ...r, best: Number(r.best), prev_best: r.prev_best == null ? null : Number(r.prev_best), improved_by: r.improved_by == null ? null : Number(r.improved_by) }));
+    },
   };
 }
 

@@ -9,7 +9,7 @@ import { ErrorMsg, RpeBadge, RpePicker, TopBar } from '../ui/common';
 import { GoodsCard } from '../ui/Goods';
 import { LiftToday } from './Lift';
 import { MyVideos } from '../ui/Videos';
-import { SprintCard } from '../ui/Sprints';
+import { Medalists, SprintCard } from '../ui/Sprints';
 
 type Tab = 'today' | 'prethrow' | 'throwing' | 'sprints' | 'lift' | 'videos';
 const TABS: [Tab, string][] = [
@@ -42,6 +42,7 @@ export function AthleteHome({ me, preview }: { me: Person; preview?: { onExit: (
           <>
             <CheckinCard me={me} day={today} onSaved={() => setVersion(v => v + 1)} />
             <Agenda me={me} go={go} />
+            <Medalists me={me} />
             {me.is_pitcher && <Objectives me={me} />}
             <WeekStrip key={version} me={me} />
           </>
@@ -63,6 +64,7 @@ export function AthleteHome({ me, preview }: { me: Person; preview?: { onExit: (
         )}
         {tab === 'sprints' && (
           <>
+            <Medalists me={me} />
             <SprintCard me={me} />
             <NextButton label="Next: Today's lift" onClick={() => go('lift')} />
           </>

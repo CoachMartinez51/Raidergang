@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api } from '../lib/api';
 import { addDays, isoDay, prettyDay } from '../lib/dates';
 import { scheduleFor } from '../lib/lifts';
-import { MEDAL_ICON, SPRINTS, fmtTime, mondayOf, sessionName, sprintOfWeek, type SprintResult, type SprintSession, type SprintType } from '../lib/sprints';
+import { MEDAL_ICON, SPRINTS, fmtTime, mondayOf, sessionName, sprintOfWeek, type SpotlightRow, type SprintResult, type SprintSession, type SprintType } from '../lib/sprints';
 import type { Person } from '../lib/types';
 import { ErrorMsg } from './common';
 
@@ -26,6 +26,7 @@ export function SprintCard({ me }: { me: Person }) {
   const [error, setError] = useState<string | null>(null);
   const [cheer, setCheer] = useState<string | null>(null);
   const [allHistory, setAllHistory] = useState(false);
+  const [takeover, setTakeover] = useState<{ sprint: SprintType; old: number; now: number } | null>(null);
 
   const reload = useCallback(() => Promise.all([api.sprintResults(me.id), api.sprintHistory(me.id)])
     .then(([r, h]) => { setRows(r); setHist(h); }).catch(e => setError(e.message)), [me.id]);
@@ -53,6 +54,12 @@ export function SprintCard({ me }: { me: Person }) {
 
   if (!rows) return error ? <ErrorMsg error={error} /> : null;
 
+  // how much faster than their first recorded week on each sprint
+  const firstOf = new Map<SprintType, SprintSession>();
+  for (const h of hist) { const f = firstOf.get(h.sprint); if (!f || h.session_date < f.session_date) firstOf.set(h.sprint, h); }
+  const myMedals = hist.filter(h => h.medal);
+  const totals = (['gold', 'silver', 'bronze'] as const).map(k => [k, myMedals.filter(h => h.medal === k).length] as const);
+
   const week = mondayOf(date);
   const thisWeek = rows.filter(r => r.sprint === sprint && !r.session_label && mondayOf(r.run_date) === week)
     .sort((a, b) => a.created_at.localeCompare(b.created_at));
@@ -66,7 +73,8 @@ export function SprintCard({ me }: { me: Person }) {
     try {
       await api.logSprint({ person_id: me.id, sprint, run_date: date, seconds: secs });
       setTime('');
-      if (!oldPr || secs < Number(oldPr.seconds)) setCheer(`New ${sprint} PR: ${fmtTime(secs)} 🔥`);
+      if (oldPr && secs < Number(oldPr.seconds)) setTakeover({ sprint, old: Number(oldPr.seconds), now: secs });
+      else if (!oldPr) setCheer(`First ${sprint} time logged: ${fmtTime(secs)}. That's your PR to beat.`);
       await reload();
     } catch (e) { setError((e as Error).message); }
     setBusy(false);
@@ -96,10 +104,25 @@ export function SprintCard({ me }: { me: Person }) {
                 <span className="small muted">{s} PR</span>
                 <span className="pr-time">{pr ? fmtTime(pr.seconds) : '—'}</span>
                 <span className="small muted">{pr ? sessionName(pr) : 'No time yet'}</span>
+                {(() => {
+                  const f = firstOf.get(s);
+                  const drop = pr && f ? Math.round((f.best - Number(pr.seconds)) * 100) / 100 : 0;
+                  return drop > 0 ? <span className="faster">−{fmtTime(drop)} since {f!.session}</span> : null;
+                })()}
                 {m && <span className="small">{(['gold', 'silver', 'bronze'] as const).filter(k => m[k]).map(k => `${MEDAL_ICON[k]}${m[k] > 1 ? `×${m[k]}` : ''}`).join(' ')}</span>}
               </div>
             );
           })}
+        </div>
+
+        <div className="medal-case">
+          <div className="row">
+            <h2 style={{ fontSize: 16 }}>Medal case</h2>
+            <span className="small">{totals.map(([k, n]) => <span key={k} style={{ marginLeft: 8, opacity: n ? 1 : 0.4 }}>{MEDAL_ICON[k]} {n}</span>)}</span>
+          </div>
+          {myMedals.length
+            ? <div className="chips">{myMedals.map(h => <span key={`${h.sprint}|${h.session}`} className={`medal-chip ${h.medal}`}>{MEDAL_ICON[h.medal!]} {h.sprint} · {h.session} · {fmtTime(h.best)}</span>)}</div>
+            : <span className="small muted">No medals yet. Top 3 times each testing week earn gold, silver and bronze.</span>}
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -146,6 +169,68 @@ export function SprintCard({ me }: { me: Person }) {
           </div>
         )}
       </div>
+      {takeover && <PrTakeover {...takeover} name={me.first_name} onClose={() => setTakeover(null)} />}
     </>
+  );
+}
+
+/** Full-screen moment when an athlete beats their PR. */
+function PrTakeover({ sprint, old, now, name, onClose }: { sprint: SprintType; old: number; now: number; name: string; onClose: () => void }) {
+  const drop = Math.round((old - now) * 100) / 100;
+  useEffect(() => {
+    const t = window.setTimeout(() => document.getElementById('pr-close')?.focus(), 50);
+    return () => window.clearTimeout(t);
+  }, []);
+  return (
+    <div className="pr-takeover" role="dialog" aria-modal="true" aria-labelledby="pr-title" onClick={onClose}>
+      <div className="pr-burst" aria-hidden="true">{Array.from({ length: 14 }, (_, i) => <span key={i} style={{ ['--i' as string]: i }} />)}</div>
+      <div className="pr-inner" onClick={e => e.stopPropagation()}>
+        <span className="pr-kicker">{sprint}</span>
+        <h1 id="pr-title" className="pr-title">NEW PR</h1>
+        <div className="pr-time">{fmtTime(now)}</div>
+        <div className="pr-from">was {fmtTime(old)} · <b>{fmtTime(drop)} faster</b></div>
+        <p className="pr-line">You got faster, {name}. Keep stacking.</p>
+        <button id="pr-close" className="btn pr-btn" onClick={onClose}>Let's go</button>
+      </div>
+    </div>
+  );
+}
+
+/** "The Medalists" + Most Improved for the latest testing week. Whole team sees it. */
+export function Medalists({ me }: { me: Person }) {
+  const [rows, setRows] = useState<SpotlightRow[] | null>(null);
+  useEffect(() => { api.sprintSpotlight().then(setRows).catch(() => setRows([])); }, []);
+  if (!rows || !rows.length) return null;
+  const { sprint, session } = rows[0];
+  const pools = [
+    { title: 'Pitchers', list: rows.filter(r => r.is_pitcher) },
+    { title: 'Position players', list: rows.filter(r => !r.is_pitcher) },
+  ].filter(p => p.list.length);
+  return (
+    <div className="card medalists">
+      <div className="row">
+        <h2>The Medalists</h2>
+        <span className="small muted">{sprint} · {session}</span>
+      </div>
+      {pools.map(p => (
+        <div key={p.title} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {pools.length > 1 && <span className="small muted" style={{ letterSpacing: 1, textTransform: 'uppercase' }}>{p.title}</span>}
+          {p.list.filter(r => r.medal).map(r => (
+            <div key={r.person_id} className={`medal-row ${r.medal} ${r.person_id === me.id ? 'me' : ''}`}>
+              <span style={{ fontSize: 20 }} aria-label={r.medal!}>{MEDAL_ICON[r.medal!]}</span>
+              <span style={{ flex: 1, fontWeight: 600 }}>{r.first_name} {r.last_name}{r.person_id === me.id ? ' (you)' : ''}</span>
+              <b style={{ fontVariantNumeric: 'tabular-nums' }}>{fmtTime(r.best)}</b>
+            </div>
+          ))}
+          {p.list.filter(r => r.most_improved).map(r => (
+            <div key={`mi-${r.person_id}`} className={`medal-row improved ${r.person_id === me.id ? 'me' : ''}`}>
+              <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--green-text)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M4 17l6-6 4 4 6-7" /><path d="M14 8h6v6" /></svg>
+              <span style={{ flex: 1 }}><b>Most Improved</b> · {r.first_name} {r.last_name}{r.person_id === me.id ? ' (you)' : ''}</span>
+              <span className="small" style={{ fontVariantNumeric: 'tabular-nums' }}>{fmtTime(r.prev_best!)} → <b>{fmtTime(r.best)}</b></span>
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
   );
 }

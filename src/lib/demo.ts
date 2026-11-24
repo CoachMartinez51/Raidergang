@@ -1,4 +1,4 @@
-import { computeSessions, type SprintResult } from './sprints';
+import { computeSessions, computeSpotlight, type SprintResult } from './sprints';
 // Demo mode: runs entirely in the browser with sample data, used until the
 // app is connected to Supabase. Nothing here leaves the device.
 import type { Api } from './api';
@@ -252,6 +252,11 @@ export function demoApi(): Api & { signInAs(email: string): void; demoAccounts()
       const d = sprintDb();
       const pitch = new Map(d.people.filter(p => !p.is_coach && p.active).map(p => [p.id, p.is_pitcher]));
       return computeSessions(d.sprints!, id => pitch.get(id) ?? null).filter(s => s.person_id === personId);
+    },
+    async sprintSpotlight() {
+      const d = sprintDb();
+      const pitch = new Map(d.people.filter(p => !p.is_coach && p.active).map(p => [p.id, p.is_pitcher]));
+      return computeSpotlight(computeSessions(d.sprints!, id => pitch.get(id) ?? null), new Map(d.people.map(p => [p.id, p])));
     },
     async sprintBoard() {
       const d = sprintDb();

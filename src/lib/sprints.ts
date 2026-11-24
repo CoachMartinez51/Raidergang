@@ -85,3 +85,42 @@ export function sprintOfWeek(block: LiftBlock, week: number): SprintType | null 
   }
   return null;
 }
+
+/** "The Medalists" for the latest testing week, plus Most Improved. Visible to the whole team. */
+export interface SpotlightRow {
+  sprint: SprintType;
+  session: string;
+  session_date: string;
+  is_pitcher: boolean;
+  person_id: string;
+  first_name: string;
+  last_name: string;
+  best: number;
+  medal: Medal | null;
+  prev_best: number | null;
+  improved_by: number | null;
+  most_improved: boolean;
+}
+
+/** Same rules as the database's sprint_spotlight(), for demo mode. */
+export function computeSpotlight(sessions: SprintSession[], names: Map<string, { first_name: string; last_name: string }>): SpotlightRow[] {
+  const medalSessions = new Map<string, string>();
+  for (const s of sessions) if (s.medal) { const k = `${s.sprint}|${s.session}`; if (!medalSessions.has(k) || s.session_date > medalSessions.get(k)!) medalSessions.set(k, s.session_date); }
+  const latest = [...medalSessions.entries()].sort((a, b) => b[1].localeCompare(a[1]))[0]?.[0];
+  if (!latest) return [];
+  const [sprint, session] = latest.split('|');
+  const cur = sessions.filter(s => s.sprint === sprint && s.session === session);
+  const rows = cur.map(c => {
+    const prev = sessions.filter(y => y.person_id === c.person_id && y.sprint === c.sprint && y.session !== c.session && y.session_date < c.session_date)
+      .sort((a, b) => b.session_date.localeCompare(a.session_date))[0];
+    const imp = prev && prev.best > c.best ? Math.round((prev.best - c.best) * 100) / 100 : null;
+    const n = names.get(c.person_id!) ?? { first_name: '?', last_name: '' };
+    return { sprint: c.sprint, session: c.session, session_date: c.session_date, is_pitcher: !!c.is_pitcher, person_id: c.person_id!, ...n,
+      best: c.best, medal: c.medal, prev_best: prev?.best ?? null, improved_by: imp, most_improved: false };
+  });
+  for (const pool of [true, false]) {
+    const top = Math.max(0, ...rows.filter(r => r.is_pitcher === pool && r.improved_by).map(r => r.improved_by!));
+    for (const r of rows) if (r.is_pitcher === pool && top > 0 && r.improved_by === top) r.most_improved = true;
+  }
+  return rows.filter(r => r.medal || r.most_improved).sort((a, b) => Number(b.is_pitcher) - Number(a.is_pitcher) || a.best - b.best);
+}
