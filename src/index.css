@@ -345,3 +345,6 @@ select.input option { background: var(--card); }
 .check-row input { width: 24px; height: 24px; accent-color: var(--green); }
 .log-row { display: flex; flex-direction: column; gap: 4px; padding: 10px 0; border-top: 1px solid var(--line); }
 .log-row .feel { font-size: 14px; line-height: 1.45; padding: 8px 10px; border-radius: 10px; background: var(--bg); border: 1px solid var(--line); }
+.start-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 4px 0; }
+.start-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 6px 4px 10px; border-radius: 999px; border: 1px solid var(--line2); font-size: 13px; font-weight: 600; }
+.start-chip button { min-height: 28px; min-width: 28px; border-radius: 999px; border: none; background: var(--bg); color: var(--muted); font-weight: 700; font-family: inherit; padding: 0 8px; }

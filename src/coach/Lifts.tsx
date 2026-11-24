@@ -123,6 +123,7 @@ function Blocks({ me, data, blocks, assignments, onChanged }: {
   const pick = (ids: string[]) => setSel(s => { const all = ids.every(i => s.includes(i)); return all ? s.filter(x => !ids.includes(x)) : [...new Set([...s, ...ids])]; });
   const assigned = useMemo(() => block ? assignments.filter(a => a.block_id === block.id) : [], [assignments, block]);
   const starts = [...new Set(assigned.map(a => a.start_date))].sort();
+  const [sure, setSure] = useState<string | null>(null);
 
   if (!block) return <div className="card small muted">No blocks yet.</div>;
   const assign = async () => {
@@ -149,9 +150,27 @@ function Blocks({ me, data, blocks, assignments, onChanged }: {
 
       <div className="section-title">Assign {block.name}</div>
       <div className="card">
-        <div className="small muted">
-          Currently assigned: {starts.length ? starts.map(s => `${assigned.filter(a => a.start_date === s).length} athletes from ${prettyDay(s)}`).join('; ') : 'nobody'}
-        </div>
+        <div className="small muted">Currently assigned:{!starts.length && ' nobody'}</div>
+        {starts.map(st => {
+          const here = assigned.filter(a => a.start_date === st);
+          const few = here.length <= 5;
+          return (
+            <div key={st} className="start-row">
+              <span className="small"><b>{here.length} athlete{here.length === 1 ? '' : 's'}</b> starting {prettyDay(st)}</span>
+              {few && here.map(a => {
+                const p = data.people.find(x => x.id === a.person_id);
+                return (
+                  <span key={a.id} className="start-chip">
+                    {p ? fullName(p) : 'Athlete'}
+                    {me.coach_can_edit && <button aria-label={`Remove ${p ? fullName(p) : 'athlete'}'s ${prettyDay(st)} start`}
+                      onClick={async () => { if (sure !== a.id) { setSure(a.id); return; } await api.endAssignment(a.id); setSure(null); onChanged(); }}>
+                      {sure === a.id ? 'Remove?' : '✕'}</button>}
+                  </span>
+                );
+              })}
+            </div>
+          );
+        })}
         {me.coach_can_edit ? (
           <>
             <label className="field" style={{ maxWidth: 220 }}>Week 1 starts (Monday)
