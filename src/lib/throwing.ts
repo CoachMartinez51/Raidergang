@@ -27,7 +27,7 @@ export const KINDS: Record<ThrowKind, { label: string; catchPlay: string | null;
   High:     { label: 'High',     catchPlay: '20–30 min (10 min max distance)',  distance: '220 ft – max',               pct: [0.85, 0.95], plyos: 'full', cls: 'k-high' },
   Bullpen:  { label: 'Bullpen',  catchPlay: 'Catch play to comfort',            distance: 'Pitch count',                pct: [0.85, 0.95], plyos: 'full', cls: 'k-high' },
   Live:     { label: 'Live',     catchPlay: 'Catch play to comfort',            distance: 'Pitches · innings · breaks', pct: [1, 1],       plyos: 'full', cls: 'k-live' },
-  Game:     { label: 'Game day', catchPlay: 'Catch play to comfort',            distance: null,                         pct: [1, 1],       plyos: 'half', cls: 'k-live' },
+  Game:     { label: 'Game day', catchPlay: 'Catch play to comfort',            distance: null,                         pct: [1, 1],       plyos: 'half', cls: 'k-high' },
   Recovery: { label: 'Recovery', catchPlay: null,                               distance: null,                         pct: null,        plyos: 'none', cls: 'k-rec' },
 };
 export const KIND_ORDER: ThrowKind[] = ['Off', 'Low', 'Medium', 'High', 'Bullpen', 'Live', 'Game', 'Recovery'];
