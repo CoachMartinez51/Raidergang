@@ -11,7 +11,7 @@ import { LiftToday } from './Lift';
 import { ThrowingTab, useThrowToday } from './Throwing';
 import { dayChip, PLYO_LABEL } from '../lib/throwing';
 import { MyVideos } from '../ui/Videos';
-import { MedalTeaser, Medalists, SprintCard } from '../ui/Sprints';
+import { MedalTeaser, Medalists, SprintCard, TrophyCase } from '../ui/Sprints';
 import { ReminderCard } from '../ui/Reminders';
 import { ProgressTab } from './Progress';
 
@@ -69,6 +69,7 @@ export function AthleteHome({ me, preview }: { me: Person; preview?: { onExit: (
         )}
         {tab === 'me' && (
           <>
+            <TrophyCase me={me} />
             <WeekStrip key={version} me={me} />
             <ProgressTab me={me} />
             <div id="medalists" className="anchor"><Medalists me={me} /></div>

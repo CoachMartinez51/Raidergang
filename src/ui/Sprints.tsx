@@ -57,8 +57,6 @@ export function SprintCard({ me }: { me: Person }) {
   // how much faster than their first recorded week on each sprint
   const firstOf = new Map<SprintType, SprintSession>();
   for (const h of hist) { const f = firstOf.get(h.sprint); if (!f || h.session_date < f.session_date) firstOf.set(h.sprint, h); }
-  const myMedals = hist.filter(h => h.medal && h.final !== false);
-  const totals = (['gold', 'silver', 'bronze'] as const).map(k => [k, myMedals.filter(h => h.medal === k).length] as const);
 
   const week = mondayOf(date);
   const thisWeek = rows.filter(r => r.sprint === sprint && !r.session_label && mondayOf(r.run_date) === week)
@@ -121,15 +119,7 @@ export function SprintCard({ me }: { me: Person }) {
           })}
         </div>
 
-        <div className="medal-case">
-          <div className="row">
-            <h2 style={{ fontSize: 16 }}>Medal case</h2>
-            <span className="small">{totals.map(([k, n]) => <span key={k} style={{ marginLeft: 8, opacity: n ? 1 : 0.4 }}>{MEDAL_ICON[k]} {n}</span>)}</span>
-          </div>
-          {myMedals.length
-            ? <div className="chips">{myMedals.map(h => <span key={`${h.sprint}|${h.session}`} className={`medal-chip ${h.medal}`}>{MEDAL_ICON[h.medal!]} {h.sprint} · {h.session} · {fmtTime(h.best)}</span>)}</div>
-            : <span className="small muted">No medals yet. Top 3 times each testing week earn gold, silver and bronze.</span>}
-        </div>
+        <span className="small muted">Your medals are in your Trophy case on the Me tab.</span>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <div className="row">
@@ -283,5 +273,44 @@ export function MedalTeaser({ me, onOpen }: { me: Person; onOpen: () => void }) 
       </span>
       <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 6l6 6-6 6" /></svg>
     </button>
+  );
+}
+
+/** The trophy case: every official medal, totals, and sprint PRs. Lives on the Me tab. */
+export function TrophyCase({ me }: { me: Person }) {
+  const [rows, setRows] = useState<SprintResult[] | null>(null);
+  const [hist, setHist] = useState<SprintSession[]>([]);
+  useEffect(() => {
+    Promise.all([api.sprintResults(me.id), api.sprintHistory(me.id)])
+      .then(([r, h]) => { setRows(r); setHist(h); }).catch(() => setRows([]));
+  }, [me.id]);
+  if (!rows) return null;
+  const won = hist.filter(h => h.medal && h.final !== false).sort((a, b) => b.session_date.localeCompare(a.session_date));
+  const totals = (['gold', 'silver', 'bronze'] as const).map(k => [k, won.filter(h => h.medal === k).length] as const);
+  const live = hist.find(h => h.final === false && h.medal);
+  const prs = new Map<SprintType, SprintResult>();
+  for (const r of rows) { const c = prs.get(r.sprint); if (!c || Number(r.seconds) < Number(c.seconds)) prs.set(r.sprint, r); }
+
+  return (
+    <div className="card trophy-case">
+      <div className="row"><h2>Trophy case</h2><span className="small muted">{won.length} medal{won.length === 1 ? '' : 's'}</span></div>
+      <div className="trophy-totals">
+        {totals.map(([k, n]) => (
+          <div key={k} className={`trophy-total ${k} ${n ? '' : 'none'}`}>
+            <span className="ic" aria-hidden="true">{MEDAL_ICON[k]}</span><b>{n}</b><span>{k[0].toUpperCase() + k.slice(1)}</span>
+          </div>
+        ))}
+      </div>
+      {live && <div className="msg info small" style={{ fontWeight: 600 }}>{MEDAL_ICON[live.medal!]} In {live.medal} position on the {live.sprint} this week. It goes in the case if you hold it until Sunday night.</div>}
+      {won.length ? (
+        <div className="chips">{won.map(h => <span key={`${h.sprint}|${h.session}`} className={`medal-chip ${h.medal}`}>{MEDAL_ICON[h.medal!]} {h.sprint} · {h.session} · {fmtTime(h.best)}</span>)}</div>
+      ) : <span className="small muted">No medals yet. The 3 fastest times each testing week earn gold, silver and bronze.</span>}
+      <span className="small muted" style={{ letterSpacing: 1, textTransform: 'uppercase', marginTop: 4 }}>Personal records</span>
+      <div className="trophy-prs">
+        {SPRINTS.map(s => { const pr = prs.get(s); return (
+          <div key={s}><span>{s}</span><b>{pr ? fmtTime(Number(pr.seconds)) : '—'}</b></div>
+        ); })}
+      </div>
+    </div>
   );
 }
