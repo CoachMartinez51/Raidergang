@@ -46,7 +46,10 @@ export function mondayOf(iso: string): string {
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 export const sessionName = (r: Pick<SprintResult, 'session_label' | 'run_date'>) => {
   if (r.session_label) return r.session_label;
-  const [, m, d] = mondayOf(r.run_date).split('-').map(Number);
+  const wk = mondayOf(r.run_date);
+  // Fall weeks are numbered by the calendar from Sep 14 (Nov 16-20 was the off week, Wk 10).
+  if (wk >= '2026-09-14' && wk <= '2026-12-28') return `Fall Wk ${Math.round((Date.parse(wk) - Date.parse('2026-09-14')) / 6048e5) + 1}`;
+  const [, m, d] = wk.split('-').map(Number);
   return `Week of ${MONTHS[m - 1]} ${d}`;
 };
 
