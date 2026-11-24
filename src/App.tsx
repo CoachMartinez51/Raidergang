@@ -47,9 +47,11 @@ type State =
   | { kind: 'error'; message: string };
 
 const NAME_KEY = 'raidergang-first-name';
+const LAST_KEY = 'raidergang-last-name';
 const savedName = () => { try { return localStorage.getItem(NAME_KEY); } catch { return null; } };
+const savedLast = () => { try { return localStorage.getItem(LAST_KEY); } catch { return null; } };
 
-/** Loading-screen lines; one is picked at random each time the app opens. {name} = first name. */
+/** Loading-screen lines; one is picked at random each time the app opens. {name} = first name, {last} = last name. */
 const GREETINGS = [
   "What's up {name}, attack the day.",
   '{name}! Whatz Up Whatz Up!',
@@ -59,21 +61,22 @@ const GREETINGS = [
   'IYAAR…',
   'One pitch at a time.',
   'Philippians 2:3',
+  'Ba Boom Mr. {last}!',
 ];
 
-function Greeting({ name }: { name: string | null }) {
+function Greeting({ name, last }: { name: string | null; last: string | null }) {
   const [line] = useState(() => {
-    const options = name ? GREETINGS : GREETINGS.filter(g => !g.includes('{name}'));
+    const options = GREETINGS.filter(g => (name || !g.includes('{name}')) && (last || !g.includes('{last}')));
     return options[Math.floor(Math.random() * options.length)];
   });
-  const parts = line.split('{name}');
+  const parts = line.split(/(\{name\}|\{last\})/);
   return (
     <div className="center greet">
       <img src="/raidergang-logo.png" alt="Raidergang · Wright State Baseball" style={{ width: 240, maxWidth: '75%' }} />
       <div style={{ fontFamily: "'Space Grotesk', Inter, sans-serif", fontSize: 24, fontWeight: 700, lineHeight: 1.3, textAlign: 'center', padding: '0 20px' }}>
-        {parts.map((p, i) => (
-          <span key={i}>{p}{i < parts.length - 1 && <span style={{ color: 'var(--gold)' }}>{name}</span>}</span>
-        ))}
+        {parts.map((p, i) => p === '{name}' || p === '{last}'
+          ? <span key={i} style={{ color: 'var(--gold)' }}>{p === '{name}' ? name : last}</span>
+          : <span key={i}>{p}</span>)}
       </div>
     </div>
   );
@@ -89,7 +92,7 @@ export default function App() {
       const email = await api.sessionEmail();
       if (!email) return setState({ kind: 'signedOut' });
       const me = await api.me();
-      if (me) { try { localStorage.setItem(NAME_KEY, me.first_name); } catch { /* ignore */ } }
+      if (me) { try { localStorage.setItem(NAME_KEY, me.first_name); localStorage.setItem(LAST_KEY, me.last_name); } catch { /* ignore */ } }
       setState(me ? { kind: 'in', me } : { kind: 'notInvited', email });
     } catch (e) {
       setState({ kind: 'error', message: (e as Error).message });
@@ -118,7 +121,7 @@ export default function App() {
 
   switch (state.kind) {
     case 'loading':
-      return <Greeting name={savedName()} />;
+      return <Greeting name={savedName()} last={savedLast()} />;
     case 'signedOut':
       return <Login />;
     case 'notInvited':
@@ -131,7 +134,7 @@ export default function App() {
         </div>
       );
     case 'in':
-      if (greeting) return <Greeting name={state.me.first_name} />;
+      if (greeting) return <Greeting name={state.me.first_name} last={state.me.last_name} />;
       return state.me.is_coach ? <CoachHome key={visit} me={state.me} /> : <AthleteHome key={visit} me={state.me} />;
   }
 }
