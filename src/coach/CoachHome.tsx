@@ -197,7 +197,7 @@ function Roster({ me, data, onOpen, onAdd }: { me: Person; data: RosterData; onO
       </div>
       {section('Athletes', athletes)}
       {section('Coaches', coaches)}
-      {section('Individuals / Professional', pros)}
+      {section('Individuals/Professional', pros)}
     </>
   );
 }
