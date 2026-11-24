@@ -8,6 +8,8 @@ import type { Checkin, Goal, GoalKind, GoodsItem, Person } from '../lib/types';
 import { ErrorMsg, RpeBadge, RpePicker, TopBar } from '../ui/common';
 import { GoodsCard, goodsDayFor } from '../ui/Goods';
 import { LiftToday } from './Lift';
+import { ThrowingTab, useThrowToday } from './Throwing';
+import { KINDS as THROW_KINDS, PLYO_LABEL } from '../lib/throwing';
 import { MyVideos } from '../ui/Videos';
 import { Medalists, SprintCard } from '../ui/Sprints';
 import { WeightChart } from '../ui/WeightChart';
@@ -52,16 +54,13 @@ export function AthleteHome({ me, preview }: { me: Person; preview?: { onExit: (
         )}
         {tab === 'prethrow' && (
           <>
-            <GoodsCard personId={me.id} note={me.goods_note} date={today} />
+            <PreThrowGoods me={me} today={today} />
             <NextButton label="Next: Catch Play" onClick={() => go('throwing')} />
           </>
         )}
         {tab === 'throwing' && (
           <>
-            <div className="card">
-              <div className="row"><h2>Catch Play</h2><span className="pill-soft">Coming soon</span></div>
-              <div className="small muted">Your throwing program will show here: distances, throw counts, intent and notes from the coaches.</div>
-            </div>
+            <ThrowingTab me={me} goPreThrow={() => go('prethrow')} />
             <NextButton label="Next: Sprints" onClick={() => go('sprints')} />
           </>
         )}
@@ -79,6 +78,13 @@ export function AthleteHome({ me, preview }: { me: Person; preview?: { onExit: (
   );
 }
 
+/** Pre-Throw: the Goods, showing half or full plyos to match today's throw. */
+function PreThrowGoods({ me, today }: { me: Person; today: string }) {
+  const t = useThrowToday(me.id);
+  if (t === undefined) return <div className="card"><h2>The Goods</h2><div className="small muted">Loading…</div></div>;
+  return <GoodsCard personId={me.id} note={me.goods_note} date={today} plyos={t.day ? t.day.plyos : undefined} />;
+}
+
 function NextButton({ label, onClick }: { label: string; onClick: () => void }) {
   return <button className="btn next-btn" onClick={onClick}>{label} →</button>;
 }
@@ -93,6 +99,7 @@ const liftTitle = (d: BlockDay) =>
 
 function Agenda({ me, go }: { me: Person; go: (t: Tab) => void }) {
   const today = isoDay();
+  const throwToday = useThrowToday(me.id);
   const [d, setD] = useState<AgendaData | null>(null);
   useEffect(() => {
     Promise.all([
@@ -118,7 +125,16 @@ function Agenda({ me, go }: { me: Person; go: (t: Tab) => void }) {
 
   const steps: { title: string; sub: string; status?: string; done?: boolean; dim?: boolean; tab: Tab }[] = [];
   if (goodsCount || me.is_pitcher) steps.push({ title: 'Pre-Throw', sub: d.goods.length ? `The Goods · ${gDay ? `Day ${gDay} · ` : ''}${goodsCount} items` : 'The Goods · nothing assigned yet', tab: 'prethrow' });
-  steps.push({ title: 'Catch Play', sub: 'Details coming with the throwing program', status: 'Soon', dim: true, tab: 'throwing' });
+  const td = throwToday?.day ?? null;
+  if (me.is_pitcher || td) {
+    if (throwToday === undefined) steps.push({ title: 'Catch Play', sub: 'Loading…', dim: true, tab: 'throwing' });
+    else if (!throwToday.program) steps.push({ title: 'Catch Play', sub: 'No throwing program assigned yet', dim: true, tab: 'throwing' });
+    else if (!td || td.kind === 'Off') steps.push({ title: 'Catch Play', sub: td && /holiday|thanksgiving|christmas|new year/i.test(td.title + ' ' + (td.note ?? '')) ? 'Holiday · no throwing' : 'Off today · full rest', status: 'Off', dim: true, tab: 'throwing' });
+    else steps.push({
+      title: 'Catch Play', sub: [td.sp_title && td.sp_title !== td.title ? 'Live outing' : td.title, PLYO_LABEL[td.plyos]].join(' · '),
+      status: THROW_KINDS[td.kind].label, tab: 'throwing',
+    });
+  }
   if (sprint) steps.push({
     title: `Sprints · ${sprint}`, sub: day!.sprints[week - 1].replace(/^\s*\d+\s*\/\s*10\s*:?\s*/, '') || 'Log your best rep',
     status: bestToday != null ? `Best ${fmtTime(bestToday)}` : 'Log time', done: bestToday != null, tab: 'sprints',

@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import type { ThrowAssignment, ThrowDay, ThrowDayDraft, ThrowProgram } from './throwing';
 import type { Category, Checkin, GoodsItem, GoodsSection, Drill, DrillDraft, Exercise, ExerciseDraft, Goal, GoalKind, Group, LibrarySync, Membership, NewGoodsItem, Person, PersonDraft, Video, VideoPatch } from './types';
 import { demoApi } from './demo';
 import { addDays, isoDay } from './dates';
@@ -63,6 +64,16 @@ export interface Api {
   removeGoods(ids: string[]): Promise<string[]>;
   /** Clear every current Goods item (optionally only some sections) for these players. Returns the ids removed. */
   clearGoods(personIds: string[], sections: GoodsSection[] | null): Promise<string[]>;
+  /** Throwing programs */
+  throwPrograms(): Promise<ThrowProgram[]>;
+  throwDays(programId: string, from: string, to: string): Promise<ThrowDay[]>;
+  saveThrowDay(programId: string, day: string, d: ThrowDayDraft): Promise<ThrowDay>;
+  copyThrowProgram(fromId: string, name: string): Promise<string>;
+  throwAssignments(): Promise<ThrowAssignment[]>;
+  setThrowProgram(personId: string, programId: string | null): Promise<void>;
+  setThrowVelo(personId: string, mph: number | null): Promise<void>;
+  /** The athlete's current program and its days in a date range. */
+  myThrowing(personId: string, from: string, to: string): Promise<{ program: ThrowProgram | null; days: ThrowDay[] }>;
   /** 11 AM reminder */
   pushPublicKey(): Promise<string | null>;
   savePushSubscription(endpoint: string, p256dh: string, auth: string, userAgent: string): Promise<void>;
@@ -284,6 +295,24 @@ function liveApi(sb: SupabaseClient): Api {
       }
       return out;
     },
+    async throwPrograms() { return must(await sb.from('throw_programs').select('id, name, active').order('name')) as ThrowProgram[]; },
+    async throwDays(programId, from, to) {
+      return must(await sb.from('throw_days').select('*').eq('program_id', programId).gte('day', from).lte('day', to).order('day')) as ThrowDay[];
+    },
+    async saveThrowDay(programId, day, d) {
+      return must(await sb.from('throw_days').upsert({ program_id: programId, day, ...d, updated_at: new Date().toISOString() }, { onConflict: 'program_id,day' }).select().single()) as ThrowDay;
+    },
+    async copyThrowProgram(fromId, name) { return must(await sb.rpc('copy_throw_program', { p_from: fromId, p_name: name })) as string; },
+    async throwAssignments() {
+      return must(await sb.from('throw_assignments').select('person_id, program_id').is('retired_at', null)) as ThrowAssignment[];
+    },
+    async setThrowProgram(personId, programId) { must(await sb.rpc('set_throw_program', { p_person: personId, p_program: programId })); },
+    async setThrowVelo(personId, mph) { must(await sb.from('people').update({ throw_velo: mph }).eq('id', personId).select('id')); },
+    async myThrowing(personId, from, to) {
+      const a = must(await sb.from('throw_assignments').select('program_id, throw_programs(id, name, active)').eq('person_id', personId).is('retired_at', null).maybeSingle()) as { program_id: string; throw_programs: ThrowProgram } | null;
+      if (!a) return { program: null, days: [] };
+      return { program: a.throw_programs, days: await this.throwDays(a.program_id, from, to) };
+    },
     async pushPublicKey() { return must(await sb.rpc('push_public_key')) as string | null; },
     async savePushSubscription(endpoint, p256dh, auth, userAgent) {
       must(await sb.rpc('save_push_subscription', { p_endpoint: endpoint, p_p256dh: p256dh, p_auth: auth, p_user_agent: userAgent }));
@@ -350,7 +379,7 @@ export function setPreviewing(on: boolean) { previewing = on; }
 const WRITES = new Set<string>([
   'signOut', 'addPerson', 'updatePerson', 'createGroup', 'setGroups', 'addGoal', 'saveCheckin',
   'savePrep', 'updateBlockDay', 'updateBlockExercise', 'addBlockExercise', 'removeBlockExercise', 'assignBlock', 'endAssignment', 'setRehab', 'logSet', 'saveExercise', 'saveDrill',
-  'updateVideo', 'rematchVideos', 'logSprint', 'removeSprint', 'prescribeGoods', 'removeGoods', 'clearGoods', 'restoreGoods', 'savePushSubscription', 'sendTestPush',
+  'updateVideo', 'rematchVideos', 'logSprint', 'removeSprint', 'prescribeGoods', 'removeGoods', 'clearGoods', 'restoreGoods', 'savePushSubscription', 'sendTestPush', 'saveThrowDay', 'copyThrowProgram', 'setThrowProgram', 'setThrowVelo',
 ]);
 const fakeSaved = (row: object) => ({
   id: `preview-${Math.random().toString(36).slice(2)}`, created_at: new Date().toISOString(),

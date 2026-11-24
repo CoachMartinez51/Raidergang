@@ -5,6 +5,7 @@ import type { Api } from './api';
 import type { Assignment, LiftBlock, RehabSwitch, SetLog } from './lifts';
 import type { Category, Checkin, GoodsItem, Drill, Exercise, Goal, Group, Membership, Person } from './types';
 import { addDays, isoDay } from './dates';
+import { KINDS, type ThrowDay, type ThrowKind, type ThrowProgram } from './throwing';
 
 const KEY = 'raidergang-demo-v1';
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2));
@@ -41,7 +42,7 @@ function seed(): Db {
   const people = [
     base({ email: 'coach.martinez@example.com', first_name: 'Myles', last_name: 'Martinez', is_coach: true, is_admin: true }),
     base({ email: 'coach.ferrick@example.com', first_name: 'Travis', last_name: 'Ferrick', is_coach: true }),
-    base({ email: 'connor.jarvis@example.com', first_name: 'Connor', last_name: 'Jarvis', is_pitcher: true, goal_weight: '204-207', goods_note: 'Get after it this winter.' }),
+    base({ email: 'connor.jarvis@example.com', first_name: 'Connor', last_name: 'Jarvis', is_pitcher: true, goal_weight: '204-207', goods_note: 'Get after it this winter.', throw_velo: 90.2 }),
     base({ email: 'ethan.wood@example.com', first_name: 'Ethan', last_name: 'Wood', is_position_player: true }),
     base({ email: 'pitcher.two@example.com', first_name: 'Sample', last_name: 'Pitcher', is_pitcher: true }),
   ];
@@ -72,6 +73,31 @@ const emit = () => listeners.forEach(l => l());
 /** Demo library lives in memory too: browser storage can be too small for it, which would re-number it on every load. */
 let libCache: Pick<Db, 'categories' | 'exercises' | 'drills'> | null = null;
 let libLoading: Promise<void> | null = null;
+// ---- Throwing (demo): two tracks built from a simple weekly pattern around today ----
+const throwProgramsDemo: ThrowProgram[] = [{ id: 'trk-a', name: 'Track A', active: true }, { id: 'trk-b', name: 'Track B', active: true }];
+const throwDaysDemo = new Map<string, ThrowDay>();   // key program|day
+const throwAssignDemo = new Map<string, string>();   // person -> program
+const throwVeloDemo = new Map<string, number | null>();
+function demoThrowDay(programId: string, day: string): ThrowDay | null {
+  const k = `${programId}|${day}`;
+  if (throwDaysDemo.has(k)) return throwDaysDemo.get(k)!;
+  const wd = (new Date(day + 'T12:00:00Z').getUTCDay() + 6) % 7; // 0 = Mon
+  const b = programId === 'trk-b';
+  const plan: [ThrowKind, string, string | null][] = b
+    ? [['Low', 'Light catch play', null], ['Off', 'Off', null], ['Low', 'Light catch play', null], ['Off', 'Off', null], ['Low', 'Light catch play', null], ['Off', 'Off', null], ['Off', 'Off', null]]
+    : [['Low', 'Long toss ~105 ft', '~105 ft'], ['Medium', 'Long toss ~130 ft', '~130 ft'], ['Off', 'Off', null], ['Medium', 'Long toss ~140 ft', '~140 ft'], ['Medium', 'Long toss ~150 ft (peak)', '~150 ft'], ['Off', 'Off', null], ['Off', 'Off', null]];
+  const [kind, title, distance] = plan[wd];
+  const d: ThrowDay = { id: `${programId}-${day}`, program_id: programId, day, kind, title, sp_title: null, distance,
+    catch_play: KINDS[kind].catchPlay, plyos: KINDS[kind].plyos,
+    note: kind === 'Off' ? 'Full rest — no throwing.' : kind === 'Low' && b ? '15-20 min flat-ground catch, no intent.' : 'Stretch-out long toss, building toward this week\'s peak.' };
+  return d;
+}
+function demoThrowRange(programId: string, from: string, to: string) {
+  const out: ThrowDay[] = [];
+  for (let d = from; d <= to; d = addDays(d, 1)) { const x = demoThrowDay(programId, d); if (x) out.push(x); }
+  return out;
+}
+
 const goodsGone = new Set<string>();
 const goodsAdded: GoodsItem[] = [];
 function demoGoodsBase(personId: string): GoodsItem[] {
@@ -177,6 +203,32 @@ export function demoApi(): Api & { signInAs(email: string): void; demoAccounts()
       const out: string[] = [];
       for (const pid of personIds) for (const g of await this.currentGoods(pid)) if (!sections || sections.includes(g.section)) { goodsGone.add(g.id); out.push(g.id); }
       return out;
+    },
+    async throwPrograms() { return throwProgramsDemo.slice(); },
+    async throwDays(programId, from, to) { return demoThrowRange(programId, from, to); },
+    async saveThrowDay(programId, day, d) {
+      const row: ThrowDay = { id: `${programId}-${day}`, program_id: programId, day, ...d };
+      throwDaysDemo.set(`${programId}|${day}`, row); return row;
+    },
+    async copyThrowProgram(fromId, name) {
+      const id = uid(); throwProgramsDemo.push({ id, name, active: true });
+      for (const [k, v] of throwDaysDemo) if (k.startsWith(fromId + '|')) throwDaysDemo.set(`${id}|${v.day}`, { ...v, program_id: id });
+      return id;
+    },
+    async throwAssignments() {
+      for (const p of load().people) if (p.is_pitcher && !p.is_coach && !throwAssignDemo.has(p.id)) throwAssignDemo.set(p.id, p.last_name === 'Jarvis' ? 'trk-b' : 'trk-a');
+      return [...throwAssignDemo].filter(([, v]) => v).map(([person_id, program_id]) => ({ person_id, program_id }));
+    },
+    async setThrowProgram(personId, programId) { if (programId) throwAssignDemo.set(personId, programId); else throwAssignDemo.delete(personId); },
+    async setThrowVelo(personId, mph) {
+      throwVeloDemo.set(personId, mph);
+      const d = load(); const p = d.people.find(x => x.id === personId); if (p) { p.throw_velo = mph; save(d); }
+    },
+    async myThrowing(personId, from, to) {
+      await this.throwAssignments();
+      const pid = throwAssignDemo.get(personId);
+      const program = throwProgramsDemo.find(p => p.id === pid) ?? null;
+      return { program, days: program ? demoThrowRange(program.id, from, to) : [] };
     },
     async pushPublicKey() { return null; },
     async savePushSubscription() { /* demo */ },

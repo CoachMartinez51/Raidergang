@@ -19,9 +19,11 @@ export interface Person {
   goal_weight: string | null;
   /** Coach's note shown at the top of the athlete's Goods */
   goods_note: string | null;
+  /** Average fall fastball (mph); drives the throwing intensity ranges. Set from the Throwing tab. */
+  throw_velo?: number | null;
 }
 
-export type PersonDraft = Omit<Person, 'id' | 'auth_user_id' | 'first_signed_in_at'>;
+export type PersonDraft = Omit<Person, 'id' | 'auth_user_id' | 'first_signed_in_at' | 'throw_velo'>;
 
 export interface Group { id: string; name: string; }
 export interface Membership { group_id: string; person_id: string; }

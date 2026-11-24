@@ -50,8 +50,10 @@ export function goodsDayFor(iso: string): 'A' | 'B' | null {
  * The athlete's Goods for a given day. Athletes see only that day's Day A/B correctives;
  * coaches (allDays) can flip between A and B.
  */
-export function GoodsCard({ personId, title = 'The Goods', note, date, allDays, editable }: {
+export function GoodsCard({ personId, title = 'The Goods', note, date, allDays, editable, plyos }: {
   personId: string; title?: string; note?: string | null; date?: string; allDays?: boolean;
+  /** Today's throw: 'half' shows only half plyos, 'none' hides plyos, 'full' shows all. Leave out to show everything. */
+  plyos?: 'none' | 'half' | 'full';
   /** Coaches who can edit get a remove button on each item. */
   editable?: boolean;
 }) {
@@ -93,7 +95,10 @@ export function GoodsCard({ personId, title = 'The Goods', note, date, allDays, 
       {noteBox}
       {undoBar}{errBox}
       {day && DAY_SECTIONS.map(s => <Section key={s} title={GOODS_LABELS[s]} items={by(s, day)} onRemove={remove} />)}
-      {ANY_SECTIONS.map(s => <Section key={s} title={GOODS_LABELS[s]} items={by(s)} onRemove={remove} />)}
+      {ANY_SECTIONS.filter(s => !plyos || !s.endsWith('_plyos') || (plyos === 'full') || (plyos === 'half' && s === 'half_plyos'))
+        .map(s => <Section key={s} title={GOODS_LABELS[s]} items={by(s)} onRemove={remove} />)}
+      {plyos === 'none' && items.some(i => i.section.endsWith('_plyos')) && <div className="small muted">No plyos today: it's an off day for your arm.</div>}
+      {plyos === 'half' && items.some(i => i.section === 'full_plyos') && <div className="small muted">Half plyos today. Full plyos come back on your bigger throwing days.</div>}
     </div>
   );
 }

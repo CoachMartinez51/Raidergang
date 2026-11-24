@@ -1,3 +1,4 @@
+import { Throwing } from './Throwing';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { api, setPreviewing } from '../lib/api';
 import { AthleteHome } from '../athlete/AthleteHome';
@@ -11,7 +12,7 @@ import { Lifts } from './Lifts';
 import { Videos } from './Videos';
 import { Sprints } from './Sprints';
 
-type Tab = 'checkins' | 'lifts' | 'sprints' | 'videos' | 'roster' | 'library';
+type Tab = 'checkins' | 'lifts' | 'throwing' | 'sprints' | 'videos' | 'roster' | 'library';
 
 export interface RosterData { people: Person[]; groups: Group[]; members: Membership[]; }
 
@@ -40,6 +41,7 @@ export function CoachHome({ me }: { me: Person }) {
       <div className="tabs">
         <button className={`tab ${tab === 'checkins' ? 'on' : ''}`} onClick={() => setTab('checkins')}>Check-ins</button>
         <button className={`tab ${tab === 'lifts' ? 'on' : ''}`} onClick={() => setTab('lifts')}>Lifts</button>
+        <button className={`tab ${tab === 'throwing' ? 'on' : ''}`} onClick={() => setTab('throwing')}>Throwing</button>
         <button className={`tab ${tab === 'sprints' ? 'on' : ''}`} onClick={() => setTab('sprints')}>Sprints</button>
         <button className={`tab ${tab === 'videos' ? 'on' : ''}`} onClick={() => setTab('videos')}>Videos</button>
         <button className={`tab ${tab === 'roster' ? 'on' : ''}`} onClick={() => setTab('roster')}>Roster</button>
@@ -56,7 +58,7 @@ export function CoachHome({ me }: { me: Person }) {
       </div>
       <div className="content">
         <ErrorMsg error={error} />
-        {tab === 'library' ? <Library me={me} /> : !data ? <div className="muted small">Loading…</div> : tab === 'lifts' ? <Lifts me={me} data={data} /> : tab === 'videos' ? <Videos me={me} data={data} /> : tab === 'sprints' ? <Sprints me={me} data={data} /> : tab === 'checkins'
+        {tab === 'library' ? <Library me={me} /> : !data ? <div className="muted small">Loading…</div> : tab === 'lifts' ? <Lifts me={me} data={data} /> : tab === 'throwing' ? <Throwing me={me} data={data} /> : tab === 'videos' ? <Videos me={me} data={data} /> : tab === 'sprints' ? <Sprints me={me} data={data} /> : tab === 'checkins'
           ? <CheckinBoard data={data} onOpen={p => setEditing(p)} />
           : <Roster me={me} data={data} onOpen={p => setEditing(p)} onAdd={() => setEditing('new')} />}
       </div>
