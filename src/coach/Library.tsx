@@ -113,11 +113,11 @@ function Group<T extends Exercise | Drill>({ title, sub, rows, onOpen }: { title
 function Drawer({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.6)', zIndex: 50, display: 'flex', justifyContent: 'flex-end' }} onClick={onClose}>
-      <div style={{ width: '100%', maxWidth: 520, height: '100%', overflowY: 'auto', background: 'var(--bg)', borderLeft: '1px solid var(--line)', padding: '20px 16px 40px', display: 'flex', flexDirection: 'column', gap: 14 }}
+      <div style={{ width: '100%', maxWidth: 520, height: '100%', overflowY: 'auto', background: 'var(--bg)', borderLeft: '1px solid var(--line)', padding: 'calc(env(safe-area-inset-top) + 16px) 16px calc(env(safe-area-inset-bottom) + 40px)', display: 'flex', flexDirection: 'column', gap: 14 }}
         onClick={e => e.stopPropagation()}>
         <div className="row">
           <h2 style={{ margin: 0, fontFamily: "'Space Grotesk', Inter, sans-serif" }}>{title}</h2>
-          <button className="link" onClick={onClose}>Close</button>
+          <button className="btn ghost small close-btn" onClick={onClose}>Close</button>
         </div>
         {children}
       </div>

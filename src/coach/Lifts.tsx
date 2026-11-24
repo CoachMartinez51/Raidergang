@@ -2,7 +2,7 @@ import { Fragment, useEffect, useMemo, useState } from 'react';
 import { api } from '../lib/api';
 import { addDays, isoDay, prettyDay } from '../lib/dates';
 import {
-  exName, isoWeekday, rxText, scheduleFor, WEEKDAY_LONG,
+  exName, isoWeekday, rxText, scheduleFor, setHasValue, setText, WEEKDAY_LONG,
   type Assignment, type LiftBlock, type SetLog,
 } from '../lib/lifts';
 import { fullName, type Person } from '../lib/types';
@@ -47,7 +47,7 @@ function WhoLifted({ data, blocks, assignments }: { data: RosterData; blocks: Li
     const s = scheduleFor(day, assignments.filter(a => a.person_id === p.id), blocks);
     const mine = (logs ?? []).filter(l => l.person_id === p.id);
     const total = s?.day ? s.day.exercises.reduce((n, e) => n + (e.weeks[s.week - 1] ? (e.log_type === 'done' ? 1 : e.weeks[s.week - 1]!.sets) : 0), 0) : 0;
-    const logged = mine.filter(l => l.weight != null || l.result || l.done).length;
+    const logged = mine.filter(setHasValue).length;
     return { p, s, mine, total, logged };
   }).filter(r => r.s?.day).sort((a, b) => (b.logged / (b.total || 1)) - (a.logged / (a.total || 1)) || a.p.last_name.localeCompare(b.p.last_name));
   const isToday = day === isoDay();
@@ -83,7 +83,7 @@ function WhoLifted({ data, blocks, assignments }: { data: RosterData; blocks: Li
                     <tr key={p.id + '-d'}><td colSpan={3} style={{ background: '#151813' }}>
                       {s!.day!.exercises.map(e => {
                         const ls = mine.filter(l => l.block_exercise_id === e.id).sort((a, b) => a.set_number - b.set_number);
-                        const vals = ls.map(l => l.done ? '✓' : (l.weight ?? l.result)).filter(v => v != null && v !== '');
+                        const vals = ls.map(setText).filter(v => v !== '');
                         return (
                           <div key={e.id} className="row small" style={{ padding: '4px 0' }}>
                             <span><b style={{ color: 'var(--gold)' }}>{e.slot}</b> {exName(e)} <span className="muted">· {rxText(e, s!.week)}</span>{ls.some(l => l.used_rehab) ? <span className="chip gold" style={{ marginLeft: 6 }}>Rehab</span> : null}</span>

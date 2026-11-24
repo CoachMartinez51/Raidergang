@@ -34,14 +34,14 @@ async function withLifts(): Promise<Db> {
 const base = (p: Partial<Person> & Pick<Person, 'email' | 'first_name' | 'last_name'>): Person => ({
   id: uid(), aliases: [], trackman_pitcher_id: null, is_pitcher: false, is_position_player: false,
   is_individual_pro: false, is_coach: false, coach_can_edit: true, is_admin: false, active: true,
-  auth_user_id: null, first_signed_in_at: null, goal_weight: null, ...p,
+  auth_user_id: null, first_signed_in_at: null, goal_weight: null, goods_note: null, ...p,
 });
 
 function seed(): Db {
   const people = [
     base({ email: 'coach.martinez@example.com', first_name: 'Myles', last_name: 'Martinez', is_coach: true, is_admin: true }),
     base({ email: 'coach.ferrick@example.com', first_name: 'Travis', last_name: 'Ferrick', is_coach: true }),
-    base({ email: 'connor.jarvis@example.com', first_name: 'Connor', last_name: 'Jarvis', is_pitcher: true, goal_weight: '204-207' }),
+    base({ email: 'connor.jarvis@example.com', first_name: 'Connor', last_name: 'Jarvis', is_pitcher: true, goal_weight: '204-207', goods_note: 'Get after it this winter.' }),
     base({ email: 'ethan.wood@example.com', first_name: 'Ethan', last_name: 'Wood', is_position_player: true }),
     base({ email: 'pitcher.two@example.com', first_name: 'Sample', last_name: 'Pitcher', is_pitcher: true }),
   ];

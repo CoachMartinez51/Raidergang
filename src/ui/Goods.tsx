@@ -33,13 +33,29 @@ function Section({ title, items }: { title: string; items: GoodsItem[] }) {
 }
 
 /** The athlete's current Goods. Used on the athlete Today screen and in the coach's player view. */
-export function GoodsCard({ personId, title = 'The Goods' }: { personId: string; title?: string }) {
+/** Day A correctives on Mon/Wed/Fri, Day B on Tue/Thu/Sat, none on Sunday. */
+export function goodsDayFor(iso: string): 'A' | 'B' | null {
+  const [y, m, d] = iso.split('-').map(Number);
+  const wd = new Date(Date.UTC(y, m - 1, d)).getUTCDay(); // 0 = Sun
+  return wd === 0 ? null : wd % 2 === 1 ? 'A' : 'B';
+}
+
+/**
+ * The athlete's Goods for a given day. Athletes see only that day's Day A/B correctives;
+ * coaches (allDays) can flip between A and B.
+ */
+export function GoodsCard({ personId, title = 'The Goods', note, date, allDays }: {
+  personId: string; title?: string; note?: string | null; date?: string; allDays?: boolean;
+}) {
   const [items, setItems] = useState<GoodsItem[] | null>(null);
-  const [day, setDay] = useState<'A' | 'B'>('A');
+  const autoDay = date ? goodsDayFor(date) : null;
+  const [pick, setPick] = useState<'A' | 'B'>('A');
+  const day = allDays || !date ? pick : autoDay;
   useEffect(() => { api.currentGoods(personId).then(setItems).catch(() => setItems([])); }, [personId]);
   if (!items) return null;
+  const noteBox = note ? <div className="goods-note"><span className="goods-note-label">From your coach</span>{note}</div> : null;
   if (!items.length) {
-    return <div className="card"><h2>{title}</h2><div className="small muted">Nothing assigned yet.</div></div>;
+    return <div className="card"><h2>{title}</h2>{noteBox}<div className="small muted">Nothing assigned yet.</div></div>;
   }
   const by = (s: GoodsSection, d?: 'A' | 'B') => items.filter(i => i.section === s && (!d || i.day === d)).sort((a, b) => a.sort_order - b.sort_order);
   const hasDays = items.some(i => i.day === 'A' || i.day === 'B');
@@ -47,15 +63,16 @@ export function GoodsCard({ personId, title = 'The Goods' }: { personId: string;
     <div className="card" style={{ gap: 6 }}>
       <div className="row">
         <h2>{title}</h2>
-        {hasDays && (
+        {hasDays && (allDays || !date ? (
           <div style={{ display: 'flex', gap: 6 }}>
             {(['A', 'B'] as const).map(d => (
-              <button key={d} className={`toggle ${day === d ? 'on' : ''}`} style={{ height: 30 }} onClick={() => setDay(d)}>Day {d}</button>
+              <button key={d} className={`toggle ${pick === d ? 'on' : ''}`} style={{ height: 30 }} onClick={() => setPick(d)}>Day {d}</button>
             ))}
           </div>
-        )}
+        ) : <span className="pill-soft">{day ? `Day ${day} correctives` : 'No correctives today'}</span>)}
       </div>
-      {DAY_SECTIONS.map(s => <Section key={s} title={GOODS_LABELS[s]} items={by(s, day)} />)}
+      {noteBox}
+      {day && DAY_SECTIONS.map(s => <Section key={s} title={GOODS_LABELS[s]} items={by(s, day)} />)}
       {ANY_SECTIONS.map(s => <Section key={s} title={GOODS_LABELS[s]} items={by(s)} />)}
     </div>
   );

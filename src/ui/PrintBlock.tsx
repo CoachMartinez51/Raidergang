@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { dateFor, exName, prescription, WEEKDAY_LONG, type LiftBlock, type SetLog } from '../lib/lifts';
+import { dateFor, exName, prescription, setText, WEEKDAY_LONG, type LiftBlock, type SetLog } from '../lib/lifts';
 import { prettyDay } from '../lib/dates';
 
 /**
@@ -18,7 +18,7 @@ export function PrintBlock({ block, athlete, startDate, logs = [], onClose }: {
   const weeks = Array.from({ length: block.weeks }, (_, i) => i + 1);
   const logged = (exId: string, week: number, set: number) => {
     const l = logs.find(x => x.block_exercise_id === exId && x.week === week && x.set_number === set);
-    return l ? (l.done ? '✓' : l.weight ?? l.result ?? '') : '';
+    return l ? setText(l) : '';
   };
 
   return createPortal(

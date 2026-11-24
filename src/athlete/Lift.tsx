@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { api } from '../lib/api';
 import { addDays, isoDay, prettyDay } from '../lib/dates';
 import {
-  dateFor, exName, exVideo, isoWeekday, prescription, rxText, scheduleFor, WEEKDAY_SHORT,
-  type Assignment, type BlockDay, type BlockExercise, type LiftBlock, type RehabSwitch, type Scheduled, type SetLog,
+  ALT_OPTIONS, amountMode, dateFor, exName, exVideo, isoWeekday, prescription, rxText, scheduleFor, setHasValue, setText, WEEKDAY_SHORT,
+  type AltOption, type Assignment, type BlockDay, type BlockExercise, type LiftBlock, type RehabSwitch, type Scheduled, type SetLog,
 } from '../lib/lifts';
 import type { Person } from '../lib/types';
 import { ErrorMsg } from '../ui/common';
@@ -121,18 +121,23 @@ function ExerciseRow({ me, e, week, date, loggable, open, onToggle, logs, histor
   const rx = prescription(e, week);
   const sets = rx?.sets ?? 0;
   const bySet = new Map(logs.map(l => [l.set_number, l]));
-  const doneCount = e.log_type === 'done' ? (bySet.get(1)?.done ? sets : 0) : [...bySet.values()].filter(l => l.weight != null || l.result).length;
+  const mode = amountMode(rx?.reps);
+  const perSet = e.log_type !== 'done' || mode != null;
+  const doneCount = !perSet ? (bySet.get(1)?.done ? sets : 0) : [...bySet.values()].filter(setHasValue).length;
   const complete = sets > 0 && doneCount >= sets;
 
   // "Last time": most recent earlier date with values for this exercise
-  const lastDate = history.find(l => l.weight != null || l.result)?.log_date;
+  const lastDate = history.find(setHasValue)?.log_date;
   const last = lastDate ? history.filter(l => l.log_date === lastDate).sort((a, b) => a.set_number - b.set_number) : [];
-  const lastText = last.map(l => l.weight ?? l.result).filter(v => v != null && v !== '').join(', ');
+  const lastText = last.map(setText).filter(Boolean).join(', ');
 
+  /** Each save is a new record; carry the set's other values forward so nothing gets wiped. */
   const save = async (set: number, patch: Partial<SetLog>) => {
+    const cur = bySet.get(set);
     const row = await api.logSet({
       person_id: me.id, block_exercise_id: e.id, log_date: date, week, set_number: set,
-      weight: null, result: null, done: false, used_rehab: rehabOn,
+      weight: cur?.weight ?? null, result: cur?.result ?? null, done: cur?.done ?? false, used_rehab: rehabOn,
+      alt: cur?.alt ?? null, reps_done: cur?.reps_done ?? null, seconds_done: cur?.seconds_done ?? null,
       exercise_name: exName(e), prescribed: rxText(e, week) || null, ...patch,
     } as Omit<SetLog, 'id' | 'created_at'>);
     onLogged(row);
@@ -158,14 +163,13 @@ function ExerciseRow({ me, e, week, date, loggable, open, onToggle, logs, histor
           {rx.note && <div className="small" style={{ color: 'var(--gold)' }}>{rx.note}</div>}
           {!rehabOn && e.rehab && <div className="small muted">Option: {e.rehab}</div>}
           {lastText && <div className="small">Last time ({prettyDay(lastDate!, { month: 'short', day: 'numeric' })}): <b>{lastText}</b></div>}
-          {e.log_type === 'done' ? (
+          {!perSet ? (
             <button className={`btn ${bySet.get(1)?.done ? 'ghost' : ''}`} disabled={!loggable}
               onClick={() => save(1, { done: !bySet.get(1)?.done })}>{bySet.get(1)?.done ? '✓ Done (tap to undo)' : `Mark done · ${rx.reps}`}</button>
           ) : (
             Array.from({ length: sets }, (_, i) => i + 1).map(n => (
-              <SetInput key={`${e.id}-${date}-${n}`} n={n} reps={rx.reps} type={e.log_type} label={e.result_label}
-                saved={bySet.get(n)} disabled={!loggable}
-                onSave={v => save(n, e.log_type === 'weight' ? { weight: v === '' ? null : Number(v) } : { result: v || null })} />
+              <SetRow key={`${e.id}-${date}-${n}`} n={n} reps={rx.reps} type={e.log_type} label={e.result_label} mode={mode}
+                saved={bySet.get(n)} disabled={!loggable} onSave={patch => save(n, patch)} />
             ))
           )}
         </div>
@@ -174,30 +178,75 @@ function ExerciseRow({ me, e, week, date, loggable, open, onToggle, logs, histor
   );
 }
 
-function SetInput({ n, reps, type, label, saved, disabled, onSave }: {
-  n: number; reps: string; type: 'weight' | 'result' | 'done'; label: string | null; saved?: SetLog; disabled: boolean;
-  onSave: (v: string) => Promise<void>;
+const sameVal = (a: string, b: string) => a.trim() === b.trim();
+
+/**
+ * One set: weight (or result), an "Alternative" dropdown that swaps the weight for a band or
+ * bodyweight on just this set, and a reps / seconds box when the prescription is AMRAP / ALAP.
+ */
+function SetRow({ n, reps, type, label, mode, saved, disabled, onSave }: {
+  n: number; reps: string; type: 'weight' | 'result' | 'done'; label: string | null; mode: 'reps' | 'seconds' | null;
+  saved?: SetLog; disabled: boolean; onSave: (patch: Partial<SetLog>) => Promise<void>;
 }) {
-  const savedVal = type === 'weight' ? (saved?.weight != null ? String(saved.weight) : '') : (saved?.result ?? '');
-  const [v, setV] = useState(savedVal);
-  const [state, setState] = useState<'idle' | 'saving' | 'saved' | 'error'>(savedVal ? 'saved' : 'idle');
-  useEffect(() => { setV(savedVal); }, [savedVal]);
-  const valid = type === 'weight' ? v === '' || (/^\d+(\.\d)?$/.test(v) && Number(v) <= 2000) : v.length <= 40;
-  const commit = async () => {
-    if (v === savedVal || !valid) return;
+  const savedMain = type === 'weight' ? (saved?.weight != null ? String(saved.weight) : '') : (saved?.result ?? '');
+  const savedAmt = mode === 'reps' ? (saved?.reps_done != null ? String(saved.reps_done) : '') : mode === 'seconds' ? (saved?.seconds_done != null ? String(saved.seconds_done) : '') : '';
+  const alt = saved?.alt ?? '';
+  const [main, setMain] = useState(savedMain);
+  const [amt, setAmt] = useState(savedAmt);
+  const [state, setState] = useState<'idle' | 'saving' | 'saved' | 'error'>(saved && setHasValue(saved) ? 'saved' : 'idle');
+  useEffect(() => { setMain(savedMain); }, [savedMain]);
+  useEffect(() => { setAmt(savedAmt); }, [savedAmt]);
+
+  const mainOk = type === 'weight' ? main === '' || (/^\d+(\.\d)?$/.test(main) && Number(main) <= 2000) : main.length <= 40;
+  const amtOk = amt === '' || (/^\d+$/.test(amt) && Number(amt) <= (mode === 'seconds' ? 3600 : 500));
+
+  const run = async (patch: Partial<SetLog>) => {
     setState('saving');
-    try { await onSave(v.trim()); setState('saved'); } catch { setState('error'); }
+    try { await onSave(patch); setState('saved'); } catch { setState('error'); }
   };
+  const commitMain = () => {
+    if (!mainOk || sameVal(main, savedMain)) return;
+    run(type === 'weight' ? { weight: main === '' ? null : Number(main), alt: null } : { result: main.trim() || null });
+  };
+  const commitAmt = () => {
+    if (!amtOk || sameVal(amt, savedAmt)) return;
+    const v = amt === '' ? null : Number(amt);
+    run(mode === 'reps' ? { reps_done: v } : { seconds_done: v });
+  };
+  const pickAlt = (v: string) => run(v ? { alt: v as AltOption, weight: null } : { alt: null });
+
   return (
-    <label className="row" style={{ gap: 10 }}>
-      <span className="small" style={{ width: 110, color: 'var(--muted)' }}>Set {n} · {reps}</span>
-      <input className="input" style={{ flex: 1, height: 42, borderColor: valid ? undefined : 'var(--red)' }}
-        inputMode={type === 'weight' ? 'decimal' : 'text'} placeholder={type === 'weight' ? 'Weight (lb)' : (label ?? 'Result')}
-        value={v} disabled={disabled} onChange={ev => { setV(ev.target.value); setState('idle'); }}
-        onBlur={commit} onKeyDown={ev => { if (ev.key === 'Enter') (ev.target as HTMLInputElement).blur(); }} />
-      <span className="small" style={{ width: 18, color: state === 'error' ? 'var(--red)' : '#5DAE3F' }}>
-        {state === 'saving' ? '…' : state === 'saved' ? '✓' : state === 'error' ? '!' : ''}
-      </span>
-    </label>
+    <div className="set-row">
+      <span className="set-label">Set {n}<span className="muted"> · {reps}</span></span>
+      <div className="set-inputs">
+        {type === 'weight' && !alt && (
+          <input className="input" aria-label={`Set ${n} weight`} style={{ flex: '1 1 90px', borderColor: mainOk ? undefined : 'var(--red)' }}
+            inputMode="decimal" placeholder="Weight (lb)" value={main} disabled={disabled}
+            onChange={ev => { setMain(ev.target.value); setState('idle'); }} onBlur={commitMain}
+            onKeyDown={ev => { if (ev.key === 'Enter') (ev.target as HTMLInputElement).blur(); }} />
+        )}
+        {type === 'result' && (
+          <input className="input" aria-label={`Set ${n} ${label ?? 'result'}`} style={{ flex: '1 1 90px' }} placeholder={label ?? 'Result'}
+            value={main} disabled={disabled} onChange={ev => { setMain(ev.target.value); setState('idle'); }} onBlur={commitMain}
+            onKeyDown={ev => { if (ev.key === 'Enter') (ev.target as HTMLInputElement).blur(); }} />
+        )}
+        {type === 'weight' && (
+          <select className={`input alt-select ${alt ? 'on' : ''}`} aria-label={`Set ${n} alternative`} value={alt} disabled={disabled}
+            onChange={ev => pickAlt(ev.target.value)} style={{ flex: alt ? '1 1 150px' : '0 0 128px' }}>
+            <option value="">{alt ? 'Back to weight' : 'Alternative'}</option>
+            {ALT_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
+          </select>
+        )}
+        {mode && (
+          <input className="input" aria-label={`Set ${n} ${mode === 'reps' ? 'reps done' : 'seconds held'}`} style={{ flex: '0 0 92px', borderColor: amtOk ? undefined : 'var(--red)' }}
+            inputMode="numeric" placeholder={mode === 'reps' ? 'Reps' : 'Seconds'} value={amt} disabled={disabled}
+            onChange={ev => { setAmt(ev.target.value); setState('idle'); }} onBlur={commitAmt}
+            onKeyDown={ev => { if (ev.key === 'Enter') (ev.target as HTMLInputElement).blur(); }} />
+        )}
+        <span className="set-state" style={{ color: state === 'error' ? 'var(--red)' : 'var(--green-text)' }} aria-live="polite">
+          {state === 'saving' ? '…' : state === 'saved' ? '✓' : state === 'error' ? '!' : ''}
+        </span>
+      </div>
+    </div>
   );
 }

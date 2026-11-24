@@ -17,6 +17,8 @@ export interface Person {
   auth_user_id: string | null;
   first_signed_in_at: string | null;
   goal_weight: string | null;
+  /** Coach's note shown at the top of the athlete's Goods */
+  goods_note: string | null;
 }
 
 export type PersonDraft = Omit<Person, 'id' | 'auth_user_id' | 'first_signed_in_at'>;
@@ -46,7 +48,7 @@ export interface Checkin {
 export const emptyPerson = (): PersonDraft => ({
   email: '', first_name: '', last_name: '', aliases: [], trackman_pitcher_id: null,
   is_pitcher: false, is_position_player: false, is_individual_pro: false,
-  is_coach: false, coach_can_edit: true, is_admin: false, active: true, goal_weight: null,
+  is_coach: false, coach_can_edit: true, is_admin: false, active: true, goal_weight: null, goods_note: null,
 });
 
 export const fullName = (p: Pick<Person, 'first_name' | 'last_name'>) => `${p.first_name} ${p.last_name}`.trim();

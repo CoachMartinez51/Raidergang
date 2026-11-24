@@ -1,15 +1,16 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
 import { addDays, isoDay, prettyDay } from '../lib/dates';
-import { scheduleFor, type BlockDay, type Scheduled, type SetLog } from '../lib/lifts';
+import { scheduleFor, setHasValue, type BlockDay, type Scheduled, type SetLog } from '../lib/lifts';
 import { rpeColor, rpeText } from '../lib/rpe';
 import { sprintOfWeek, fmtTime, type SprintResult } from '../lib/sprints';
 import type { Checkin, Goal, GoalKind, GoodsItem, Person } from '../lib/types';
 import { ErrorMsg, RpeBadge, RpePicker, TopBar } from '../ui/common';
-import { GoodsCard } from '../ui/Goods';
+import { GoodsCard, goodsDayFor } from '../ui/Goods';
 import { LiftToday } from './Lift';
 import { MyVideos } from '../ui/Videos';
 import { Medalists, SprintCard } from '../ui/Sprints';
+import { WeightChart } from '../ui/WeightChart';
 
 type Tab = 'today' | 'prethrow' | 'throwing' | 'sprints' | 'lift' | 'videos';
 const TABS: [Tab, string][] = [
@@ -49,7 +50,7 @@ export function AthleteHome({ me, preview }: { me: Person; preview?: { onExit: (
         )}
         {tab === 'prethrow' && (
           <>
-            <GoodsCard personId={me.id} />
+            <GoodsCard personId={me.id} note={me.goods_note} date={today} />
             <NextButton label="Next: Catch Play" onClick={() => go('throwing')} />
           </>
         )}
@@ -108,12 +109,13 @@ function Agenda({ me, go }: { me: Person; go: (t: Tab) => void }) {
   const bestToday = sprintToday.length ? Math.min(...sprintToday.map(r => Number(r.seconds))) : null;
 
   const totalSets = day ? day.exercises.reduce((n, e) => n + (e.weeks[week - 1]?.sets ?? 0), 0) : 0;
-  const doneSets = day ? new Set(d.logs.filter(l => day.exercises.some(e => e.id === l.block_exercise_id) && (l.done || l.weight != null || l.result))
+  const doneSets = day ? new Set(d.logs.filter(l => day.exercises.some(e => e.id === l.block_exercise_id) && setHasValue(l))
     .map(l => `${l.block_exercise_id}|${l.set_number}`)).size : 0;
-  const goodsCount = d.goods.length;
+  const gDay = goodsDayFor(today);
+  const goodsCount = d.goods.filter(g => g.day === gDay || (g.day !== 'A' && g.day !== 'B')).length;
 
   const steps: { title: string; sub: string; status?: string; done?: boolean; dim?: boolean; tab: Tab }[] = [];
-  if (goodsCount || me.is_pitcher) steps.push({ title: 'Pre-Throw', sub: goodsCount ? `The Goods · ${goodsCount} items` : 'The Goods · nothing assigned yet', tab: 'prethrow' });
+  if (goodsCount || me.is_pitcher) steps.push({ title: 'Pre-Throw', sub: d.goods.length ? `The Goods · ${gDay ? `Day ${gDay} · ` : ''}${goodsCount} items` : 'The Goods · nothing assigned yet', tab: 'prethrow' });
   steps.push({ title: 'Catch Play', sub: 'Details coming with the throwing program', status: 'Soon', dim: true, tab: 'throwing' });
   if (sprint) steps.push({
     title: `Sprints · ${sprint}`, sub: day!.sprints[week - 1].replace(/^\s*\d+\s*\/\s*10\s*:?\s*/, '') || 'Log your best rep',
@@ -249,6 +251,7 @@ function Objectives({ me }: { me: Person }) {
 function WeekStrip({ me }: { me: Person }) {
   const today = isoDay();
   const [rows, setRows] = useState<Checkin[] | null>(null);
+  const [trend, setTrend] = useState(false);
   useEffect(() => { api.checkinHistory(me.id, 6).then(setRows).catch(() => setRows([])); }, [me.id]);
   if (!rows) return null;
   const days = Array.from({ length: 7 }, (_, i) => addDays(today, i - 6));
@@ -270,6 +273,10 @@ function WeekStrip({ me }: { me: Person }) {
           );
         })}
       </div>
+      <button className="link" style={{ alignSelf: 'flex-start', padding: 0 }} aria-expanded={trend} onClick={() => setTrend(t => !t)}>
+        {trend ? 'Hide weight trend' : 'See weight trend'}
+      </button>
+      {trend && <WeightChart personId={me.id} goal={me.goal_weight} title="Your weight trend" />}
     </div>
   );
 }

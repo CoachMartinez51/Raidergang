@@ -68,7 +68,35 @@ export interface SetLog {
   used_rehab: boolean;
   exercise_name: string;
   prescribed: string | null;
+  /** A band or bodyweight used instead of a weight for this set */
+  alt?: AltOption | null;
+  /** AMRAP: reps done. ALAP: seconds held. */
+  reps_done?: number | null;
+  seconds_done?: number | null;
   created_at: string;
+}
+
+/** Options an athlete can pick in place of a weight (also band assistance, e.g. chin ups). */
+export const ALT_OPTIONS = [
+  'Bodyweight', 'Single Orange Band', 'Single Red Band', 'Single Green Band', 'Single Black Band',
+  'Double Orange', 'Double Red', 'Double Green', 'Red & Orange', 'Green & Red',
+] as const;
+export type AltOption = (typeof ALT_OPTIONS)[number];
+
+/** AMRAP = log reps done; ALAP = log seconds held. */
+export const amountMode = (reps: string | null | undefined): 'reps' | 'seconds' | null =>
+  !reps ? null : /amrap/i.test(reps) ? 'reps' : /alap/i.test(reps) ? 'seconds' : null;
+
+/** Anything logged on this set? */
+export const setHasValue = (l: SetLog) =>
+  l.done || l.weight != null || !!l.result || !!l.alt || l.reps_done != null || l.seconds_done != null;
+
+/** Short text for one set: "185", "Red Band", "135 × 12", "45 sec". */
+export function setText(l: SetLog): string {
+  if (l.done && l.weight == null && !l.alt && l.reps_done == null && l.seconds_done == null && !l.result) return '✓';
+  const main = l.alt ?? (l.weight != null ? String(l.weight) : l.result ?? '');
+  const amt = l.reps_done != null ? `${l.reps_done} reps` : l.seconds_done != null ? `${l.seconds_done} sec` : '';
+  return [main, amt].filter(Boolean).join(main && amt ? ' × ' : '');
 }
 
 export interface RehabSwitch { id: string; person_id: string; block_exercise_id: string; active: boolean }

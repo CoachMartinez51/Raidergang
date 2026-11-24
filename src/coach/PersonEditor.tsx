@@ -5,6 +5,7 @@ import { emptyPerson, fullName, type Checkin, type Goal, type GoalKind, type Per
 import { ErrorMsg, RpeBadge } from '../ui/common';
 import type { RosterData } from './CoachHome';
 import { GoodsCard } from '../ui/Goods';
+import { WeightChart } from '../ui/WeightChart';
 import { RehabPanel } from './Lifts';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -56,6 +57,7 @@ export function PersonEditor({ me, person, data, onClose, onSaved }: {
         aliases: aliases.split(',').map(s => s.trim()).filter(Boolean),
         trackman_pitcher_id: d.trackman_pitcher_id?.trim() || null,
         goal_weight: d.goal_weight?.trim() || null,
+        goods_note: d.goods_note?.trim() || null,
         coach_can_edit: d.is_coach ? d.coach_can_edit || d.is_admin : true,
         is_admin: d.is_coach && d.is_admin,
       };
@@ -82,11 +84,11 @@ export function PersonEditor({ me, person, data, onClose, onSaved }: {
   const ro = !canEdit;
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.6)', zIndex: 50, display: 'flex', justifyContent: 'flex-end' }} onClick={onClose}>
-      <div style={{ width: '100%', maxWidth: 520, height: '100%', overflowY: 'auto', background: 'var(--bg)', borderLeft: '1px solid var(--line)', padding: '20px 16px 40px', display: 'flex', flexDirection: 'column', gap: 14 }}
+      <div style={{ width: '100%', maxWidth: 520, height: '100%', overflowY: 'auto', background: 'var(--bg)', borderLeft: '1px solid var(--line)', padding: 'calc(env(safe-area-inset-top) + 16px) 16px calc(env(safe-area-inset-bottom) + 40px)', display: 'flex', flexDirection: 'column', gap: 14 }}
         onClick={e => e.stopPropagation()}>
         <div className="row">
           <h2 style={{ margin: 0, fontFamily: "'Space Grotesk', Inter, sans-serif" }}>{isNew ? 'Add person' : fullName(person!)}</h2>
-          <button className="link" onClick={onClose}>Close</button>
+          <button className="btn ghost small close-btn" onClick={onClose}>Close</button>
         </div>
         {ro && <div className="msg info">You have view-only access.</div>}
 
@@ -103,6 +105,9 @@ export function PersonEditor({ me, person, data, onClose, onSaved }: {
           </label>
           <label className="field">Goal weight (optional)
             <input className="input" disabled={ro} placeholder="e.g. 204-207" value={d.goal_weight ?? ''} onChange={e => set('goal_weight', e.target.value)} />
+          </label>
+          <label className="field">Note at the top of their Goods (optional)
+            <textarea className="input" rows={2} maxLength={1000} disabled={ro} placeholder="e.g. Get after it this winter" value={d.goods_note ?? ''} onChange={e => set('goods_note', e.target.value)} />
           </label>
           <label className="field">Trackman pitcher ID (optional)
             <input className="input" disabled={ro} value={d.trackman_pitcher_id ?? ''} onChange={e => set('trackman_pitcher_id', e.target.value)} />
@@ -164,7 +169,8 @@ export function PersonEditor({ me, person, data, onClose, onSaved }: {
         {!ro && <button className="btn" disabled={!valid || busy} onClick={save}>{busy ? 'Saving…' : isNew ? 'Add to roster' : 'Save changes'}</button>}
         {!valid && !ro && <span className="small muted">Needs a first and last name, a valid email, and at least one role.</span>}
 
-        {!isNew && person!.is_pitcher && <GoodsCard personId={person!.id} />}
+        {!isNew && !person!.is_coach && <WeightChart personId={person!.id} goal={d.goal_weight} />}
+        {!isNew && person!.is_pitcher && <GoodsCard personId={person!.id} note={d.goods_note} />}
         {!isNew && !person!.is_coach && <RehabPanel me={me} person={person!} />}
 
         {!isNew && !d.is_coach && (
