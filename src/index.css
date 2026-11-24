@@ -257,3 +257,12 @@ select.input option { background: var(--card); }
 .focus-tag { font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 999px; background: var(--line); color: var(--muted); }
 
 .drawer > * { flex-shrink: 0; }
+
+/* Goods: remove + clear */
+.goods-x { flex-shrink: 0; min-width: 36px; min-height: 36px; margin-left: 4px; border-radius: 10px; border: 1px solid var(--line2); background: transparent; color: var(--muted); font-size: 13px; font-weight: 700; }
+.goods-x.sure { background: #5A1F1F; border-color: #8A2E2E; color: #FFD9D9; padding: 0 10px; }
+.undo-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; border-radius: 10px; background: var(--green-soft); border: 1px solid #1D5A3B; }
+.link-btn { background: none; border: 0; color: var(--gold); font-weight: 700; font-size: 14px; min-height: 36px; padding: 0 6px; }
+.btn.danger { background: #8A2E2E; color: #fff; border-color: #8A2E2E; }
+.confirm-box { display: flex; flex-direction: column; gap: 10px; padding: 12px; border-radius: 12px; border: 1px solid #8A2E2E; background: #2A1212; }
+.reminder-card { gap: 10px; border-color: #1D5A3B; }

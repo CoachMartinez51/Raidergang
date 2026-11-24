@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { api } from '../lib/api';
 import { DRILL_FOCUS, DRILL_TYPES, fitsOf, type LibrarySync, type Category, type Drill, type DrillDraft, type Exercise, type ExerciseDraft, type Person } from '../lib/types';
 import { ErrorMsg } from '../ui/common';
+import { ClearGoods } from './ClearGoods';
 import { MultiSelect } from '../ui/MultiSelect';
 import { Prescribe } from './Prescribe';
 
@@ -12,6 +13,7 @@ const match = (term: string, ...fields: (string | null | undefined | string[])[]
 
 export function Library({ me }: { me: Person }) {
   const [kind, setKind] = useState<Kind>('exercises');
+  const [clearing, setClearing] = useState(false);
   const [cats, setCats] = useState<Category[]>([]);
   const [exercises, setExercises] = useState<Exercise[] | null>(null);
   const [drills, setDrills] = useState<Drill[] | null>(null);
@@ -67,6 +69,7 @@ export function Library({ me }: { me: Person }) {
         <input className="input" style={{ maxWidth: 360 }} placeholder={kind === 'exercises' ? 'Search exercises, old names…' : 'Search drills, ball type…'} value={q} onChange={e => setQ(e.target.value)} />
         <div style={{ display: 'flex', gap: 8 }}>
           <button className={`toggle ${showInactive ? 'on' : ''}`} onClick={() => setShowInactive(s => !s)}>Show retired</button>
+          {me.coach_can_edit && <button className="btn ghost small" onClick={() => setClearing(true)}>Clear Goods…</button>}
           {me.coach_can_edit && <button className="btn small" onClick={() => setEditing('new')}>+ Add {kind === 'exercises' ? 'exercise' : 'drill'}</button>}
         </div>
       </div>
@@ -92,6 +95,7 @@ export function Library({ me }: { me: Person }) {
           })
         : groupedDrills.map(([t, rows]) => <Group key={t} title={t} sub="" rows={rows as Drill[]} onOpen={setEditing} />)}
 
+      {clearing && <Drawer title="Clear the staff's Goods" onClose={() => setClearing(false)}><ClearGoods onDone={() => setClearing(false)} /></Drawer>}
       {editing && (kind === 'exercises'
         ? <ExerciseEditor me={me} cats={cats} item={editing === 'new' ? null : editing as Exercise}
             onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load(); }} />
@@ -130,7 +134,7 @@ function Group<T extends Exercise | Drill>({ title, sub, rows, onOpen, home }: {
   );
 }
 
-function Drawer({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+export function Drawer({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.6)', zIndex: 50, display: 'flex', justifyContent: 'flex-end' }} onClick={onClose}>
       <div className="drawer" style={{ width: '100%', maxWidth: 520, height: '100%', overflowY: 'auto', background: 'var(--bg)', borderLeft: '1px solid var(--line)', padding: 'calc(env(safe-area-inset-top) + 16px) 16px calc(env(safe-area-inset-bottom) + 40px)', display: 'flex', flexDirection: 'column', gap: 14 }}

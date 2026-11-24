@@ -11,6 +11,7 @@ import { LiftToday } from './Lift';
 import { MyVideos } from '../ui/Videos';
 import { Medalists, SprintCard } from '../ui/Sprints';
 import { WeightChart } from '../ui/WeightChart';
+import { ReminderCard } from '../ui/Reminders';
 
 type Tab = 'today' | 'prethrow' | 'throwing' | 'sprints' | 'lift' | 'videos';
 const TABS: [Tab, string][] = [
@@ -42,6 +43,7 @@ export function AthleteHome({ me, preview }: { me: Person; preview?: { onExit: (
         {tab === 'today' && (
           <>
             <CheckinCard me={me} day={today} onSaved={() => setVersion(v => v + 1)} />
+            <ReminderCard />
             <Agenda me={me} go={go} />
             <Medalists me={me} />
             {me.is_pitcher && <Objectives me={me} />}

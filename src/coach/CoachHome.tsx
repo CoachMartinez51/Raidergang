@@ -96,6 +96,8 @@ function CheckinBoard({ data, onOpen }: { data: RosterData; onOpen: (p: Person) 
   const { shown, chips } = useFilter(data);
 
   useEffect(() => { setRows(null); api.checkinsOn(day).then(setRows).catch(e => setError(e.message)); }, [day]);
+  const [push, setPush] = useState<{ athletes: number; with_reminders: number } | null>(null);
+  useEffect(() => { api.pushStatus().then(setPush).catch(() => setPush(null)); }, []);
 
   const byPerson = new Map((rows ?? []).map(c => [c.person_id, c]));
   const sorted = [...shown].sort((a, b) => {
@@ -116,7 +118,7 @@ function CheckinBoard({ data, onOpen }: { data: RosterData; onOpen: (p: Person) 
           <span style={{ fontWeight: 600, minWidth: 130, textAlign: 'center' }}>{isToday ? 'Today' : prettyDay(day)}</span>
           <button className="btn ghost small" disabled={isToday} onClick={() => setDay(addDays(day, 1))}>›</button>
         </div>
-        <span className="small muted">{done.length} of {shown.length} checked in{flagged.length ? ` · ${flagged.length} at RPE ${RPE_FLAG_AT} or below` : ''}</span>
+        <span className="small muted">{done.length} of {shown.length} checked in{flagged.length ? ` · ${flagged.length} at RPE ${RPE_FLAG_AT} or below` : ''}{push ? ` · 🔔 ${push.with_reminders} of ${push.athletes} have the 11 AM reminder on` : ''}</span>
       </div>
       {chips}
       <ErrorMsg error={error} />

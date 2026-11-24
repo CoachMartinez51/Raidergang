@@ -170,7 +170,7 @@ export function PersonEditor({ me, person, data, onClose, onSaved }: {
         {!valid && !ro && <span className="small muted">Needs a first and last name, a valid email, and at least one role.</span>}
 
         {!isNew && !person!.is_coach && <WeightChart personId={person!.id} goal={d.goal_weight} />}
-        {!isNew && person!.is_pitcher && <GoodsCard personId={person!.id} note={d.goods_note} />}
+        {!isNew && person!.is_pitcher && <GoodsCard personId={person!.id} note={d.goods_note} editable={!ro} />}
         {!isNew && !person!.is_coach && <RehabPanel me={me} person={person!} />}
 
         {!isNew && !d.is_coach && (

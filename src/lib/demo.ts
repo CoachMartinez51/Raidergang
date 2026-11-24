@@ -72,6 +72,20 @@ const emit = () => listeners.forEach(l => l());
 /** Demo library lives in memory too: browser storage can be too small for it, which would re-number it on every load. */
 let libCache: Pick<Db, 'categories' | 'exercises' | 'drills'> | null = null;
 let libLoading: Promise<void> | null = null;
+const goodsGone = new Set<string>();
+const goodsAdded: GoodsItem[] = [];
+function demoGoodsBase(personId: string): GoodsItem[] {
+      const mk = (day: GoodsItem['day'], section: GoodsItem['section'], name: string, dose: string, i: number, balls: string | null = null): GoodsItem =>
+        ({ id: `${personId}-${section}-${day}-${i}`, person_id: personId, day, section, sort_order: i, name, dose, balls, note: null, video_url: 'https://youtube.com' });
+      return [
+        mk('A', 'soft_tissue', 'Thoracic Spine Soft Tissue', '1-3 min', 0), mk('A', 'soft_tissue', 'Posterior Cuff Soft Tissue 1', '1-3 min', 1),
+        mk('A', 'correctives', 'Shoulder CARs/Circles on Wall', '1 x 10 ea', 0), mk('A', 'correctives', 'Spinal Hygiene (WSU)', 'Until Comfort', 1),
+        mk('B', 'soft_tissue', 'Hip Soft Tissue', '1-3 min', 0), mk('B', 'correctives', 'Elevated Pigeon Stretch', '2 x 45 sec', 0),
+        mk('any', 'feels', 'Med Ball Duo (OH + Scoop Primer)', '2 x 5 ea', 0),
+        mk('any', 'half_plyos', 'Deadman Throws', '1-2 x 5-8', 0, 'Yellow, Red'), mk('any', 'full_plyos', 'Drop Step on Mound', '1-2 x 5-8', 0, 'Red, White, Grey'),
+      ];
+    }
+
 async function withLibrary(): Promise<Db> {
   if (!libCache) libLoading ??= buildLibrary();
   await libLoading;
@@ -156,16 +170,19 @@ export function demoApi(): Api & { signInAs(email: string): void; demoAccounts()
     async currentGoods(personId) {
       const p = load().people.find(x => x.id === personId);
       if (!p?.is_pitcher) return [];
-      const mk = (day: GoodsItem['day'], section: GoodsItem['section'], name: string, dose: string, i: number, balls: string | null = null): GoodsItem =>
-        ({ id: `${personId}-${section}-${day}-${i}`, person_id: personId, day, section, sort_order: i, name, dose, balls, note: null, video_url: 'https://youtube.com' });
-      return [
-        mk('A', 'soft_tissue', 'Thoracic Spine Soft Tissue', '1-3 min', 0), mk('A', 'soft_tissue', 'Posterior Cuff Soft Tissue 1', '1-3 min', 1),
-        mk('A', 'correctives', 'Shoulder CARs/Circles on Wall', '1 x 10 ea', 0), mk('A', 'correctives', 'Spinal Hygiene (WSU)', 'Until Comfort', 1),
-        mk('B', 'soft_tissue', 'Hip Soft Tissue', '1-3 min', 0), mk('B', 'correctives', 'Elevated Pigeon Stretch', '2 x 45 sec', 0),
-        mk('any', 'feels', 'Med Ball Duo (OH + Scoop Primer)', '2 x 5 ea', 0),
-        mk('any', 'half_plyos', 'Deadman Throws', '1-2 x 5-8', 0, 'Yellow, Red'), mk('any', 'full_plyos', 'Drop Step on Mound', '1-2 x 5-8', 0, 'Red, White, Grey'),
-      ];
+      return demoGoodsBase(personId).concat(goodsAdded.filter(g => g.person_id === personId)).filter(g => !goodsGone.has(g.id));
     },
+    async removeGoods(ids) { const out = ids.filter(i => !goodsGone.has(i)); out.forEach(i => goodsGone.add(i)); return out; },
+    async clearGoods(personIds, sections) {
+      const out: string[] = [];
+      for (const pid of personIds) for (const g of await this.currentGoods(pid)) if (!sections || sections.includes(g.section)) { goodsGone.add(g.id); out.push(g.id); }
+      return out;
+    },
+    async pushPublicKey() { return null; },
+    async savePushSubscription() { /* demo */ },
+    async sendTestPush() { /* demo */ },
+    async pushStatus() { return { athletes: load().people.filter(p => p.active && !p.is_coach).length, with_reminders: 0 }; },
+    async restoreGoods(ids) { ids.forEach(i => goodsGone.delete(i)); return ids.length; },
     async listBlocks() { return structuredClone(await demoBlocks()); },
     async updateBlockDay(id, patch) { for (const b of await demoBlocks()) for (const d of b.days) if (d.id === id) Object.assign(d, patch); },
     async updateBlockExercise(id, patch) {
@@ -238,7 +255,14 @@ export function demoApi(): Api & { signInAs(email: string): void; demoAccounts()
       save(d); return row;
     },
     async lastLibrarySync() { return null; },
-    async prescribeGoods(rows) { return rows.length; },
+    async prescribeGoods(rows) {
+      const lib = await withLibrary();
+      for (const r of rows) {
+        const x = r.exercise_id ? lib.exercises!.find(e => e.id === r.exercise_id) : lib.drills!.find(d => d.id === r.drill_id);
+        goodsAdded.push({ id: uid(), person_id: r.person_id, day: r.day, section: r.section, sort_order: r.sort_order, name: x?.name ?? 'Item', dose: r.dose, balls: r.balls, note: r.note, video_url: x?.video_url ?? null });
+      }
+      return rows.length;
+    },
     async listVideos(personId) {
       const p = personId ? load().people.find(x => x.id === personId) : null;
       if (personId && !p?.is_pitcher) return [];

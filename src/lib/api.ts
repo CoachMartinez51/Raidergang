@@ -1,5 +1,5 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import type { Category, Checkin, GoodsItem, Drill, DrillDraft, Exercise, ExerciseDraft, Goal, GoalKind, Group, LibrarySync, Membership, NewGoodsItem, Person, PersonDraft, Video, VideoPatch } from './types';
+import type { Category, Checkin, GoodsItem, GoodsSection, Drill, DrillDraft, Exercise, ExerciseDraft, Goal, GoalKind, Group, LibrarySync, Membership, NewGoodsItem, Person, PersonDraft, Video, VideoPatch } from './types';
 import { demoApi } from './demo';
 import { addDays, isoDay } from './dates';
 import type { SprintResult, SprintSession, SprintType, SpotlightRow } from './sprints';
@@ -59,6 +59,17 @@ export interface Api {
   lastLibrarySync(): Promise<LibrarySync | null>;
   /** Add Library items to players' Goods (coaches). */
   prescribeGoods(rows: NewGoodsItem[]): Promise<number>;
+  /** Take items off players' Goods. History is kept (rows are retired, not deleted). Returns the ids removed. */
+  removeGoods(ids: string[]): Promise<string[]>;
+  /** Clear every current Goods item (optionally only some sections) for these players. Returns the ids removed. */
+  clearGoods(personIds: string[], sections: GoodsSection[] | null): Promise<string[]>;
+  /** 11 AM reminder */
+  pushPublicKey(): Promise<string | null>;
+  savePushSubscription(endpoint: string, p256dh: string, auth: string, userAgent: string): Promise<void>;
+  sendTestPush(): Promise<void>;
+  pushStatus(): Promise<{ athletes: number; with_reminders: number } | null>;
+  /** Undo a remove / clear. */
+  restoreGoods(ids: string[]): Promise<number>;
 
   /** personId = one athlete; null = everything a coach can see */
   listVideos(personId: string | null): Promise<Video[]>;
@@ -258,6 +269,39 @@ function liveApi(sb: SupabaseClient): Api {
       const r = must(await sb.from('goods_items').insert(rows).select('id')) as { id: string }[];
       return r.length;
     },
+    async removeGoods(ids) {
+      if (!ids.length) return [];
+      const r = must(await sb.from('goods_items').update({ active: false, retired_at: new Date().toISOString() }).in('id', ids).eq('active', true).select('id')) as { id: string }[];
+      return r.map(x => x.id);
+    },
+    async clearGoods(personIds, sections) {
+      const out: string[] = [];
+      for (let i = 0; i < personIds.length; i += 50) {
+        let q = sb.from('goods_items').update({ active: false, retired_at: new Date().toISOString() }).in('person_id', personIds.slice(i, i + 50)).eq('active', true);
+        if (sections) q = q.in('section', sections);
+        const r = must(await q.select('id')) as { id: string }[];
+        out.push(...r.map(x => x.id));
+      }
+      return out;
+    },
+    async pushPublicKey() { return must(await sb.rpc('push_public_key')) as string | null; },
+    async savePushSubscription(endpoint, p256dh, auth, userAgent) {
+      must(await sb.rpc('save_push_subscription', { p_endpoint: endpoint, p_p256dh: p256dh, p_auth: auth, p_user_agent: userAgent }));
+    },
+    async sendTestPush() { must(await sb.rpc('send_me_test_push')); },
+    async pushStatus() {
+      const r = await sb.rpc('push_status');
+      if (r.error) return null; // not set up yet
+      return (r.data as { athletes: number; with_reminders: number }[])[0] ?? null;
+    },
+    async restoreGoods(ids) {
+      let n = 0;
+      for (let i = 0; i < ids.length; i += 100) {
+        const r = must(await sb.from('goods_items').update({ active: true, retired_at: null }).in('id', ids.slice(i, i + 100)).select('id')) as { id: string }[];
+        n += r.length;
+      }
+      return n;
+    },
     async lastLibrarySync() {
       const rows = must(await sb.from('library_sync_log').select('*').order('ran_at', { ascending: false }).limit(1)) as LibrarySync[];
       return rows[0] ?? null;
@@ -306,7 +350,7 @@ export function setPreviewing(on: boolean) { previewing = on; }
 const WRITES = new Set<string>([
   'signOut', 'addPerson', 'updatePerson', 'createGroup', 'setGroups', 'addGoal', 'saveCheckin',
   'savePrep', 'updateBlockDay', 'updateBlockExercise', 'addBlockExercise', 'removeBlockExercise', 'assignBlock', 'endAssignment', 'setRehab', 'logSet', 'saveExercise', 'saveDrill',
-  'updateVideo', 'rematchVideos', 'logSprint', 'removeSprint', 'prescribeGoods',
+  'updateVideo', 'rematchVideos', 'logSprint', 'removeSprint', 'prescribeGoods', 'removeGoods', 'clearGoods', 'restoreGoods', 'savePushSubscription', 'sendTestPush',
 ]);
 const fakeSaved = (row: object) => ({
   id: `preview-${Math.random().toString(36).slice(2)}`, created_at: new Date().toISOString(),
@@ -316,6 +360,7 @@ export const api: Api = new Proxy(realApi, {
   get(target, prop, receiver) {
     const value = Reflect.get(target, prop, receiver);
     if (previewing && typeof prop === 'string' && WRITES.has(prop)) {
+      if (prop === 'removeGoods' || prop === 'clearGoods') return async () => [];
       return async (arg?: object) => (prop === 'saveCheckin' || prop === 'logSet' || prop === 'logSprint') ? fakeSaved({ retired_at: null, ...(arg ?? {}) }) : undefined;
     }
     return typeof value === 'function' ? value.bind(target) : value;

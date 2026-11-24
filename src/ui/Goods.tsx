@@ -5,7 +5,9 @@ import { GOODS_LABELS, type GoodsItem, type GoodsSection } from '../lib/types';
 const DAY_SECTIONS: GoodsSection[] = ['soft_tissue', 'correctives'];
 const ANY_SECTIONS: GoodsSection[] = ['feels', 'half_plyos', 'full_plyos'];
 
-function Item({ it }: { it: GoodsItem }) {
+function Item({ it, onRemove }: { it: GoodsItem; onRemove?: (it: GoodsItem) => void }) {
+  const [sure, setSure] = useState(false);
+  useEffect(() => { if (!sure) return; const t = setTimeout(() => setSure(false), 4000); return () => clearTimeout(t); }, [sure]);
   return (
     <div className="row" style={{ alignItems: 'flex-start', padding: '8px 0', borderBottom: '1px solid var(--line)' }}>
       <div style={{ minWidth: 0 }}>
@@ -18,16 +20,20 @@ function Item({ it }: { it: GoodsItem }) {
       {it.video_url
         ? <a href={it.video_url} target="_blank" rel="noreferrer" className="small" style={{ fontWeight: 600, flexShrink: 0, paddingTop: 2 }}>Video ↗</a>
         : <span className="small muted" style={{ flexShrink: 0 }}>No video</span>}
+      {onRemove && (
+        <button className={`goods-x ${sure ? 'sure' : ''}`} aria-label={`Remove ${it.name}`}
+          onClick={() => sure ? onRemove(it) : setSure(true)}>{sure ? 'Remove' : '✕'}</button>
+      )}
     </div>
   );
 }
 
-function Section({ title, items }: { title: string; items: GoodsItem[] }) {
+function Section({ title, items, onRemove }: { title: string; items: GoodsItem[]; onRemove?: (it: GoodsItem) => void }) {
   if (!items.length) return null;
   return (
     <div>
       <div className="small" style={{ fontWeight: 700, color: 'var(--gold)', letterSpacing: 0.5, textTransform: 'uppercase', marginTop: 6 }}>{title}</div>
-      {items.map(it => <Item key={it.id} it={it} />)}
+      {items.map(it => <Item key={it.id} it={it} onRemove={onRemove} />)}
     </div>
   );
 }
@@ -44,10 +50,23 @@ export function goodsDayFor(iso: string): 'A' | 'B' | null {
  * The athlete's Goods for a given day. Athletes see only that day's Day A/B correctives;
  * coaches (allDays) can flip between A and B.
  */
-export function GoodsCard({ personId, title = 'The Goods', note, date, allDays }: {
+export function GoodsCard({ personId, title = 'The Goods', note, date, allDays, editable }: {
   personId: string; title?: string; note?: string | null; date?: string; allDays?: boolean;
+  /** Coaches who can edit get a remove button on each item. */
+  editable?: boolean;
 }) {
   const [items, setItems] = useState<GoodsItem[] | null>(null);
+  const [undo, setUndo] = useState<{ ids: string[]; name: string } | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const reload = () => api.currentGoods(personId).then(setItems).catch(() => setItems([]));
+  const remove = editable ? async (it: GoodsItem) => {
+    setErr(null);
+    try { const ids = await api.removeGoods([it.id]); setUndo({ ids, name: it.name }); await reload(); }
+    catch (e) { setErr((e as Error).message); }
+  } : undefined;
+  const doUndo = async () => { if (!undo) return; await api.restoreGoods(undo.ids); setUndo(null); await reload(); };
+  const undoBar = undo ? <div className="undo-bar small"><span>Removed {undo.name}.</span><button className="link-btn" onClick={doUndo}>Undo</button></div> : null;
+  const errBox = err ? <div className="small" style={{ color: 'var(--red, #e66)' }}>{err}</div> : null;
   const autoDay = date ? goodsDayFor(date) : null;
   const [pick, setPick] = useState<'A' | 'B'>('A');
   const day = allDays || !date ? pick : autoDay;
@@ -55,7 +74,7 @@ export function GoodsCard({ personId, title = 'The Goods', note, date, allDays }
   if (!items) return null;
   const noteBox = note ? <div className="goods-note"><span className="goods-note-label">From Myles:</span>{note}</div> : null;
   if (!items.length) {
-    return <div className="card"><h2>{title}</h2>{noteBox}<div className="small muted">Nothing assigned yet.</div></div>;
+    return <div className="card"><h2>{title}</h2>{noteBox}{undoBar}<div className="small muted">Nothing assigned yet.</div></div>;
   }
   const by = (s: GoodsSection, d?: 'A' | 'B') => items.filter(i => i.section === s && (!d || i.day === d)).sort((a, b) => a.sort_order - b.sort_order);
   const hasDays = items.some(i => i.day === 'A' || i.day === 'B');
@@ -72,8 +91,9 @@ export function GoodsCard({ personId, title = 'The Goods', note, date, allDays }
         ) : <span className="pill-soft">{day ? `Day ${day} correctives` : 'No correctives today'}</span>)}
       </div>
       {noteBox}
-      {day && DAY_SECTIONS.map(s => <Section key={s} title={GOODS_LABELS[s]} items={by(s, day)} />)}
-      {ANY_SECTIONS.map(s => <Section key={s} title={GOODS_LABELS[s]} items={by(s)} />)}
+      {undoBar}{errBox}
+      {day && DAY_SECTIONS.map(s => <Section key={s} title={GOODS_LABELS[s]} items={by(s, day)} onRemove={remove} />)}
+      {ANY_SECTIONS.map(s => <Section key={s} title={GOODS_LABELS[s]} items={by(s)} onRemove={remove} />)}
     </div>
   );
 }
