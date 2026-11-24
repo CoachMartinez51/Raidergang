@@ -12,13 +12,13 @@ import { ThrowingTab, useThrowToday } from './Throwing';
 import { KINDS as THROW_KINDS, PLYO_LABEL } from '../lib/throwing';
 import { MyVideos } from '../ui/Videos';
 import { Medalists, SprintCard } from '../ui/Sprints';
-import { WeightChart } from '../ui/WeightChart';
 import { ReminderCard } from '../ui/Reminders';
+import { ProgressTab } from './Progress';
 
-type Tab = 'today' | 'prethrow' | 'throwing' | 'sprints' | 'lift' | 'videos';
+type Tab = 'today' | 'prethrow' | 'throwing' | 'sprints' | 'lift' | 'videos' | 'progress';
 const TABS: [Tab, string][] = [
   ['today', 'Today'], ['prethrow', 'Pre-Throw'], ['throwing', 'Throwing'],
-  ['sprints', 'Sprints'], ['lift', 'Lift'], ['videos', 'Videos'],
+  ['sprints', 'Sprints'], ['lift', 'Lift'], ['progress', 'Progress'], ['videos', 'Videos'],
 ];
 
 export function AthleteHome({ me, preview }: { me: Person; preview?: { onExit: () => void } }) {
@@ -49,7 +49,7 @@ export function AthleteHome({ me, preview }: { me: Person; preview?: { onExit: (
             <Agenda me={me} go={go} />
             <Medalists me={me} />
             {me.is_pitcher && <Objectives me={me} />}
-            <WeekStrip key={version} me={me} />
+            <WeekStrip key={version} me={me} onProgress={() => go('progress')} />
           </>
         )}
         {tab === 'prethrow' && (
@@ -72,6 +72,7 @@ export function AthleteHome({ me, preview }: { me: Person; preview?: { onExit: (
           </>
         )}
         {tab === 'lift' && <LiftToday me={me} />}
+        {tab === 'progress' && <ProgressTab me={me} />}
         {tab === 'videos' && <MyVideos personId={me.id} showEmpty />}
       </div>
     </div>
@@ -266,10 +267,9 @@ function Objectives({ me }: { me: Person }) {
 }
 
 /** The past 7 days at a glance: RPE colour and bodyweight per day. */
-function WeekStrip({ me }: { me: Person }) {
+function WeekStrip({ me, onProgress }: { me: Person; onProgress: () => void }) {
   const today = isoDay();
   const [rows, setRows] = useState<Checkin[] | null>(null);
-  const [trend, setTrend] = useState(false);
   useEffect(() => { api.checkinHistory(me.id, 6).then(setRows).catch(() => setRows([])); }, [me.id]);
   if (!rows) return null;
   const days = Array.from({ length: 7 }, (_, i) => addDays(today, i - 6));
@@ -291,10 +291,7 @@ function WeekStrip({ me }: { me: Person }) {
           );
         })}
       </div>
-      <button className="link" style={{ alignSelf: 'flex-start', padding: 0 }} aria-expanded={trend} onClick={() => setTrend(t => !t)}>
-        {trend ? 'Hide weight trend' : 'See weight trend'}
-      </button>
-      {trend && <WeightChart personId={me.id} goal={me.goal_weight} title="Your weight trend" />}
+      <button className="link" style={{ alignSelf: 'flex-start', padding: 0 }} onClick={onProgress}>See your weight graph ›</button>
     </div>
   );
 }
