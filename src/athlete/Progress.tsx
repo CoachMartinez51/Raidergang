@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
 import { addDays, isoDay, prettyDay } from '../lib/dates';
 import type { Checkin, Person } from '../lib/types';
+import { LiftChart } from '../ui/LiftChart';
 import { parseGoal, WeightChart } from '../ui/WeightChart';
 
 /** Progress tab: every weigh-in on one line graph, with the goal shaded, like the fall reports. */
@@ -46,6 +47,7 @@ export function ProgressTab({ me }: { me: Person }) {
         )}
       </div>
       <WeightChart personId={me.id} goal={me.goal_weight} title="Every weigh-in" initial="all" />
+      <LiftChart personId={me.id} title="Your lifts" />
     </>
   );
 }
