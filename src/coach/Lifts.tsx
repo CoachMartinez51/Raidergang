@@ -173,7 +173,7 @@ function Blocks({ me, data, blocks, assignments, onChanged }: {
             <button className="btn" disabled={!sel.length || busy || isoWeekday(start) !== 1} onClick={assign}>
               {isoWeekday(start) !== 1 ? 'Pick a Monday' : `Assign to ${sel.length} athlete${sel.length === 1 ? '' : 's'}`}
             </button>
-            <span className="small muted">Already-assigned athletes are skipped.</span>
+            <span className="small muted">Anyone already on this block is skipped. To move one athlete to a new start date, remove his start on his roster card first.</span>
           </>
         ) : <span className="small muted">You have view-only access.</span>}
       </div>

@@ -6,6 +6,7 @@ import { ErrorMsg, RpeBadge } from '../ui/common';
 import type { RosterData } from './CoachHome';
 import { GoodsCard } from '../ui/Goods';
 import { LiftChart } from '../ui/LiftChart';
+import { PlayerBlocks } from './PlayerBlocks';
 import { PlayerThrowing } from './Throwing';
 import { WeightChart } from '../ui/WeightChart';
 import { RehabPanel } from './Lifts';
@@ -172,6 +173,7 @@ export function PersonEditor({ me, person, data, onClose, onSaved }: {
         {!valid && !ro && <span className="small muted">Needs a first and last name, a valid email, and at least one role.</span>}
 
         {!isNew && !person!.is_coach && <WeightChart personId={person!.id} goal={d.goal_weight} />}
+        {!isNew && !person!.is_coach && <PlayerBlocks me={me} person={person!} />}
         {!isNew && !person!.is_coach && <LiftChart personId={person!.id} title="Lifts over time" />}
         {!isNew && person!.is_pitcher && <PlayerThrowing me={me} person={person!} />}
         {!isNew && person!.is_pitcher && <GoodsCard personId={person!.id} note={d.goods_note} editable={!ro} />}

@@ -271,7 +271,7 @@ export function demoApi(): Api & { signInAs(email: string): void; demoAccounts()
     async assignBlock(blockId, personIds, startDate) {
       const d = await withLifts(); let n = 0;
       for (const person_id of personIds) {
-        if (d.assignments!.some(a => a.block_id === blockId && a.person_id === person_id && a.start_date === startDate)) continue;
+        if (d.assignments!.some(a => a.block_id === blockId && a.person_id === person_id && a.active)) continue;
         d.assignments!.push({ id: uid(), block_id: blockId, person_id, start_date: startDate, active: true }); n++;
       }
       save(d); return n;

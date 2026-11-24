@@ -235,6 +235,10 @@ function liveApi(sb: SupabaseClient): Api {
     },
     async assignBlock(blockId, personIds, startDate) {
       if (!personIds.length) return 0;
+      // Skip anyone already on this block (any start date), so a second tap can't restart him at Week 1.
+      const on = must(await sb.from('block_assignments').select('person_id').eq('block_id', blockId).eq('active', true)) as { person_id: string }[];
+      personIds = personIds.filter(id => !on.some(o => o.person_id === id));
+      if (!personIds.length) return 0;
       const rows = personIds.map(person_id => ({ block_id: blockId, person_id, start_date: startDate }));
       const r = must(await sb.from('block_assignments').upsert(rows, { onConflict: 'block_id,person_id,start_date', ignoreDuplicates: true }).select('id')) as { id: string }[];
       return r.length;
