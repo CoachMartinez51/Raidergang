@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../lib/api';
 import { addDays, isoDay, prettyDay } from '../lib/dates';
-import { intensityText, KIND_ORDER, KINDS, mondayOf, PLYO_LABEL, type Plyos, type ThrowAssignment, type ThrowDay, type ThrowDayDraft, type ThrowKind, type ThrowProgram } from '../lib/throwing';
+import { intensityText, KIND_ORDER, KINDS, mondayOf, PLYO_LABEL, shortTitle, type Plyos, type ThrowAssignment, type ThrowDay, type ThrowDayDraft, type ThrowKind, type ThrowProgram } from '../lib/throwing';
 import { fullName, type Person } from '../lib/types';
 import { ErrorMsg } from '../ui/common';
 import type { RosterData } from './CoachHome';
@@ -104,7 +104,7 @@ export function Throwing({ me, data }: { me: Person; data: RosterData }) {
   );
 }
 
-function DayEditor({ ro, program, date, day, onSaved, onClose }: {
+export function DayEditor({ ro, program, date, day, onSaved, onClose }: {
   ro: boolean; program: ThrowProgram; date: string; day: ThrowDay | null; onSaved: (d: ThrowDay) => void; onClose: () => void;
 }) {
   const blank: ThrowDayDraft = { kind: 'Off', title: 'Off', sp_title: null, distance: null, catch_play: null, plyos: 'none', note: null };
@@ -252,6 +252,101 @@ function AssignView({ ro, data, programs, assign, onChanged }: {
           </span>
         </div>
       ))}
+    </div>
+  );
+}
+
+/** On a pitcher's roster card: his program, his velo, and his next two weeks (tap a day to change it). */
+export function PlayerThrowing({ me, person }: { me: Person; person: Person }) {
+  const ro = !me.coach_can_edit;
+  const [programs, setPrograms] = useState<ThrowProgram[] | null>(null);
+  const [pid, setPid] = useState<string | null>(null);
+  const [velo, setVelo] = useState(person.throw_velo != null ? String(person.throw_velo) : '');
+  const [start, setStart] = useState(mondayOf(isoDay()));
+  const [days, setDays] = useState<Map<string, ThrowDay>>(new Map());
+  const [sel, setSel] = useState<string | null>(null);
+  const [msg, setMsg] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = () => Promise.all([api.throwPrograms(), api.throwAssignments()]).then(([p, a]) => {
+    setPrograms(p); setPid(a.find(x => x.person_id === person.id)?.program_id ?? null);
+  }).catch(e => setError((e as Error).message));
+  useEffect(() => { load(); }, [person.id]);
+  const end = addDays(start, 13);
+  useEffect(() => {
+    if (!pid) { setDays(new Map()); return; }
+    api.throwDays(pid, start, end).then(r => setDays(new Map(r.map(d => [d.day, d])))).catch(e => setError((e as Error).message));
+  }, [pid, start, end]);
+
+  if (!programs) return <div className="card"><h2>Throwing</h2><div className="small muted">{error ? 'Throwing isn\'t set up yet.' : 'Loading…'}</div></div>;
+  const program = programs.find(p => p.id === pid) ?? null;
+  const shared = program ? /^Track [A-Z]$/.test(program.name) : false;
+
+  const move = async (id: string | null) => {
+    setError(null); setMsg(null);
+    try { await api.setThrowProgram(person.id, id); setPid(id); setSel(null); } catch (e) { setError((e as Error).message); }
+  };
+  const saveVelo = async () => {
+    const raw = velo.trim(); const mph = raw ? Number(raw) : null;
+    if (mph != null && (!isFinite(mph) || mph < 50 || mph > 105)) { setError('Enter a velo between 50 and 105.'); return; }
+    if ((person.throw_velo ?? null) == mph) return;
+    setError(null);
+    try { await api.setThrowVelo(person.id, mph); person.throw_velo = mph; setMsg('Velo saved'); } catch (e) { setError((e as Error).message); }
+  };
+  const customize = async () => {
+    if (!program) return;
+    setError(null);
+    try {
+      const id = await api.copyThrowProgram(program.id, `${program.name} · ${person.last_name}`);
+      await api.setThrowProgram(person.id, id);
+      await load(); setPid(id);
+      setMsg(`${person.first_name} now has his own copy of ${program.name}. Changes here only affect him.`);
+    } catch (e) { setError((e as Error).message); }
+  };
+
+  return (
+    <div className="card" style={{ gap: 10 }}>
+      <h2>Throwing</h2>
+      <div className="grid2">
+        <label className="field">Program
+          <select className="input" disabled={ro} value={pid ?? ''} onChange={e => move(e.target.value || null)}>
+            <option value="">None</option>
+            {programs.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+        </label>
+        <label className="field">Avg fastball (mph)
+          <input className="input" inputMode="decimal" disabled={ro} placeholder="e.g. 88.5" value={velo} onChange={e => setVelo(e.target.value)} onBlur={saveVelo} />
+        </label>
+      </div>
+      {program && shared && !ro && (
+        <div className="small muted">Editing a day here changes it for everyone on {program.name}.{' '}
+          <button className="link-btn" onClick={customize}>Make his own copy</button> to change just {person.first_name}'s days.</div>
+      )}
+      {msg && <div className="small" style={{ color: 'var(--green-text)' }}>{msg}</div>}
+      <ErrorMsg error={error} />
+      {program && (
+        <>
+          <div className="row" style={{ justifyContent: 'flex-start', gap: 8 }}>
+            <button className="btn ghost small" onClick={() => setStart(s => addDays(s, -14))}>‹</button>
+            <span className="small" style={{ fontWeight: 600 }}>{prettyDay(start, { month: 'short', day: 'numeric' })} – {prettyDay(end, { month: 'short', day: 'numeric' })}</span>
+            <button className="btn ghost small" onClick={() => setStart(s => addDays(s, 14))}>›</button>
+          </div>
+          <div className="pt-grid">
+            {WD.map(w => <span key={w} className="tcal-h">{w}</span>)}
+            {Array.from({ length: 14 }, (_, i) => addDays(start, i)).map(iso => {
+              const d = days.get(iso);
+              return (
+                <button key={iso} className={`pt-cell ${d ? KINDS[d.kind].cls : 'k-none'} ${iso === sel ? 'sel' : ''} ${iso === isoDay() ? 'today' : ''}`} onClick={() => setSel(iso)}
+                  aria-label={`${prettyDay(iso)}: ${d ? d.title : 'nothing planned'}`}>
+                  <b>{Number(iso.slice(8))}</b><span>{d ? shortTitle(d) : '–'}</span>
+                </button>
+              );
+            })}
+          </div>
+          {sel && <DayEditor key={`${program.id}|${sel}`} ro={ro} program={program} date={sel} day={days.get(sel) ?? null}
+            onSaved={d => setDays(m => new Map(m).set(d.day, d))} onClose={() => setSel(null)} />}
+        </>
+      )}
     </div>
   );
 }
