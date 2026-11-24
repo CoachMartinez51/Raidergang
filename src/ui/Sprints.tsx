@@ -89,8 +89,8 @@ export function SprintCard({ me }: { me: Person }) {
 
   return (
     <>
-      <div className="section-title">Sprints</div>
       <div className="card" style={{ gap: 12 }}>
+        <div className="row"><h2>Sprints</h2>{rows.some(r => !r.session_label && r.run_date === isoDay()) && <span className="pill-green">✓ Done</span>}</div>
         {liveNow?.medal && (
           <div className="msg info" style={{ fontWeight: 600 }}>
             {MEDAL_ICON[liveNow.medal]} You're in {liveNow.medal} position on the {liveNow.sprint} this week ({fmtTime(liveNow.best)}). Hold it until Sunday night.
@@ -256,5 +256,32 @@ function Board({ me, rows, live }: { me: Person; rows: SpotlightRow[]; live?: bo
         );
       })}
     </div>
+  );
+}
+
+/** One line on Today: who leads this week's board (or the last official medals), tap to see it. */
+export function MedalTeaser({ me, onOpen }: { me: Person; onOpen: () => void }) {
+  const [rows, setRows] = useState<SpotlightRow[] | null>(null);
+  useEffect(() => { api.sprintSpotlight().then(setRows).catch(() => setRows([])); }, []);
+  if (!rows || !rows.length) return null;
+  const live = rows.filter(r => r.status === 'live');
+  const set = live.length ? live : rows.filter(r => r.status === 'official');
+  if (!set.length) return null;
+  const pool = set.filter(r => r.is_pitcher === me.is_pitcher && r.rk <= 3);
+  const list = (pool.length ? pool : set.filter(r => r.rk <= 3)).sort((a, b) => a.rk - b.rk);
+  const leader = list[0];
+  const mine = set.find(r => r.person_id === me.id && r.rk <= 3);
+  return (
+    <button className="card teaser" onClick={onOpen}>
+      <span style={{ fontSize: 22 }} aria-hidden="true">{live.length ? '⏱️' : '🏅'}</span>
+      <span style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
+        <span className="step-title">{live.length ? `This week's ${set[0].sprint} board is live` : `Official medals · ${set[0].sprint}`}</span>
+        <span className="small muted" style={{ display: 'block' }}>
+          {mine ? `You're #${mine.rk} (${fmtTime(mine.best)}). ` : ''}
+          {leader ? `${leader.medal ? MEDAL_ICON[leader.medal] + ' ' : ''}${leader.first_name} ${leader.last_name} leads at ${fmtTime(leader.best)}` : ''}
+        </span>
+      </span>
+      <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 6l6 6-6 6" /></svg>
+    </button>
   );
 }

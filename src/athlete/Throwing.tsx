@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { api } from '../lib/api';
 import { addDays, isoDay, prettyDay } from '../lib/dates';
 import { CALC_ROWS, dayChip, dayCls, INTENSITY_FROM, intensityText, KINDS, mondayOf, mphText, PLYO_LABEL, shortTitle, showIntensity, type ThrowDay, type ThrowLog, type ThrowProgram } from '../lib/throwing';
@@ -28,8 +28,10 @@ export function useThrowToday(personId: string) {
 }
 
 /** The athlete's Throwing tab: today's throw, this week, their intensity numbers, and the month. */
-export function ThrowingTab({ me, goPreThrow }: { me: Person; goPreThrow: () => void }) {
+export function ThrowingTab({ me, goods }: { me: Person; goods: ReactNode }) {
   const today = isoDay();
+  const [showMonth, setShowMonth] = useState(false);
+  const goPreThrow = () => document.getElementById('goods')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   const [month, setMonth] = useState(monthStart(today));
   const [sel, setSel] = useState(today);
   const [program, setProgram] = useState<ThrowProgram | null | undefined>(undefined);
@@ -49,9 +51,12 @@ export function ThrowingTab({ me, goPreThrow }: { me: Person; goPreThrow: () => 
 
   if (program === undefined) return <div className="card"><h2>Catch Play</h2><div className="small muted">Loading…</div></div>;
   if (!program) return (
-    <div className="card"><h2>Catch Play</h2>
-      <div className="small muted">{err ? `Couldn't load your throwing program (${err}).` : 'No throwing program assigned yet. Coach will add you.'}</div>
-    </div>
+    <>
+      <div id="goods" className="anchor">{goods}</div>
+      <div className="card"><h2>Catch Play</h2>
+        <div className="small muted">{err ? `Couldn't load your throwing program (${err}).` : 'No throwing program assigned yet. Coach will add you.'}</div>
+      </div>
+    </>
   );
 
   const d = days.get(sel) ?? null;
@@ -60,6 +65,7 @@ export function ThrowingTab({ me, goPreThrow }: { me: Person; goPreThrow: () => 
     <>
       <div className="row"><span className="small muted">Winter Arm Build-Up</span><span className="pill-soft gold">{program.name}</span></div>
       <DayHero d={d} date={sel} today={today} />
+      {sel === today && <div id="goods" className="anchor">{goods}</div>}
       {d && d.kind !== 'Off' && d.kind !== 'Recovery' && <DayDetail d={d} velo={velo} goPreThrow={goPreThrow} />}
       {d && d.kind !== 'Off' && sel <= today && <ThrowLogCard me={me} d={d} />}
 
@@ -77,7 +83,12 @@ export function ThrowingTab({ me, goPreThrow }: { me: Person; goPreThrow: () => 
           })}
         </div>
         <Legend intensity={showIntensity(week[0]) || showIntensity(week[6])} />
+        <button className="btn ghost small" style={{ alignSelf: 'flex-start' }} aria-expanded={showMonth} onClick={() => setShowMonth(v => !v)}>
+          {showMonth ? 'Hide full calendar' : 'Full calendar'}
+        </button>
       </div>
+      {showMonth && <MonthCard month={month} days={days} sel={sel} today={today} onPick={setSel}
+        onPrev={() => setMonth(m => shiftMonth(m, -1))} onNext={() => setMonth(m => shiftMonth(m, 1))} />}
 
       {today >= INTENSITY_FROM && <div className="card" style={{ gap: 4 }}>
         <div className="row"><h2>What is MY intensity?</h2><span className="small muted">{velo ? `Avg fastball ${velo} mph` : ''}</span></div>
@@ -86,9 +97,6 @@ export function ThrowingTab({ me, goPreThrow }: { me: Person; goPreThrow: () => 
         )) : <div className="small muted">Your fall average fastball isn't in yet. Coach will add it, then your mph ranges show here.</div>}
         {velo && <div className="small muted" style={{ marginTop: 6 }}>Based on your average fastball from the fall (Trackman).</div>}
       </div>}
-
-      <MonthCard month={month} days={days} sel={sel} today={today} onPick={setSel}
-        onPrev={() => setMonth(m => shiftMonth(m, -1))} onNext={() => setMonth(m => shiftMonth(m, 1))} />
     </>
   );
 }

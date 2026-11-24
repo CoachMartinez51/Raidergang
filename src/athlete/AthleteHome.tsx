@@ -11,21 +11,25 @@ import { LiftToday } from './Lift';
 import { ThrowingTab, useThrowToday } from './Throwing';
 import { dayChip, PLYO_LABEL } from '../lib/throwing';
 import { MyVideos } from '../ui/Videos';
-import { Medalists, SprintCard } from '../ui/Sprints';
+import { MedalTeaser, Medalists, SprintCard } from '../ui/Sprints';
 import { ReminderCard } from '../ui/Reminders';
 import { ProgressTab } from './Progress';
 
-type Tab = 'today' | 'prethrow' | 'throwing' | 'sprints' | 'lift' | 'videos' | 'progress';
-const TABS: [Tab, string][] = [
-  ['today', 'Today'], ['prethrow', 'Pre-Throw'], ['throwing', 'Throwing'],
-  ['sprints', 'Sprints'], ['lift', 'Lift'], ['progress', 'Progress'], ['videos', 'Videos'],
-];
+type Tab = 'today' | 'throw' | 'lift' | 'me';
+/** Agenda steps point at a tab, optionally a spot on it. */
+type Target = Tab | `${Tab}#${string}`;
 
 export function AthleteHome({ me, preview }: { me: Person; preview?: { onExit: () => void } }) {
   const today = isoDay();
   const [tab, setTab] = useState<Tab>('today');
   const [version, setVersion] = useState(0);
-  const go = (t: Tab) => { setTab(t); window.scrollTo(0, 0); };
+  const go = (t: Target) => {
+    const [tb, anchor] = t.split('#') as [Tab, string | undefined];
+    setTab(tb);
+    if (anchor) setTimeout(() => document.getElementById(anchor)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 350);
+    else window.scrollTo(0, 0);
+  };
+  const tabs: [Tab, string][] = [['today', 'Today'], ...(me.is_pitcher ? [['throw', 'Throw'] as [Tab, string]] : []), ['lift', 'Lift'], ['me', 'Me']];
 
   return (
     <div className="shell">
@@ -36,8 +40,8 @@ export function AthleteHome({ me, preview }: { me: Person; preview?: { onExit: (
         </div>
       )}
       <TopBar me={me} sub={prettyDay(today, { weekday: 'short', month: 'short', day: 'numeric' })} />
-      <nav className="tabs" aria-label="Sections">
-        {TABS.map(([k, label]) => (
+      <nav className="tabs tabs-even" aria-label="Sections">
+        {tabs.map(([k, label]) => (
           <button key={k} className={`tab ${tab === k ? 'on' : ''}`} aria-current={tab === k ? 'page' : undefined} onClick={() => go(k)}>{label}</button>
         ))}
       </nav>
@@ -46,34 +50,31 @@ export function AthleteHome({ me, preview }: { me: Person; preview?: { onExit: (
           <>
             <CheckinCard me={me} day={today} onSaved={() => setVersion(v => v + 1)} />
             <ReminderCard />
-            <Agenda me={me} go={go} />
-            <Medalists me={me} />
+            <Agenda key={version} me={me} go={go} />
             {me.is_pitcher && <Objectives me={me} />}
-            <WeekStrip key={version} me={me} onProgress={() => go('progress')} />
+            <MedalTeaser me={me} onOpen={() => go('me#medalists')} />
           </>
         )}
-        {tab === 'prethrow' && (
+        {tab === 'throw' && (
           <>
-            <PreThrowGoods me={me} today={today} />
-            <NextButton label="Next: Catch Play" onClick={() => go('throwing')} />
-          </>
-        )}
-        {tab === 'throwing' && (
-          <>
-            <ThrowingTab me={me} goPreThrow={() => go('prethrow')} />
-            <NextButton label="Next: Sprints" onClick={() => go('sprints')} />
-          </>
-        )}
-        {tab === 'sprints' && (
-          <>
-            <Medalists me={me} />
-            <SprintCard me={me} />
+            <ThrowingTab me={me} goods={<PreThrowGoods me={me} today={today} />} />
             <NextButton label="Next: Today's lift" onClick={() => go('lift')} />
           </>
         )}
-        {tab === 'lift' && <LiftToday me={me} />}
-        {tab === 'progress' && <ProgressTab me={me} />}
-        {tab === 'videos' && <MyVideos personId={me.id} showEmpty />}
+        {tab === 'lift' && (
+          <>
+            <LiftToday me={me} />
+            <div id="sprints" className="anchor"><SprintCard me={me} /></div>
+          </>
+        )}
+        {tab === 'me' && (
+          <>
+            <WeekStrip key={version} me={me} />
+            <ProgressTab me={me} />
+            <div id="medalists" className="anchor"><Medalists me={me} /></div>
+            <div id="videos" className="anchor"><MyVideos personId={me.id} showEmpty /></div>
+          </>
+        )}
       </div>
     </div>
   );
@@ -98,7 +99,7 @@ interface AgendaData { sched: Scheduled | null; goods: GoodsItem[]; logs: SetLog
 const liftTitle = (d: BlockDay) =>
   d.focus === 'lower' ? "Today's Lower Body Lift" : d.focus === 'upper' ? "Today's Upper Body Lift" : `Today's lift: ${d.label}`;
 
-function Agenda({ me, go }: { me: Person; go: (t: Tab) => void }) {
+function Agenda({ me, go }: { me: Person; go: (t: Target) => void }) {
   const today = isoDay();
   const throwToday = useThrowToday(me.id);
   const [d, setD] = useState<AgendaData | null>(null);
@@ -124,21 +125,21 @@ function Agenda({ me, go }: { me: Person; go: (t: Tab) => void }) {
   const gDay = goodsDayFor(today);
   const goodsCount = d.goods.filter(g => g.day === gDay || (g.day !== 'A' && g.day !== 'B')).length;
 
-  const steps: { title: string; sub: string; status?: string; done?: boolean; dim?: boolean; tab: Tab }[] = [];
-  if (goodsCount || me.is_pitcher) steps.push({ title: 'Pre-Throw', sub: d.goods.length ? `The Goods · ${gDay ? `Day ${gDay} · ` : ''}${goodsCount} items` : 'The Goods · nothing assigned yet', tab: 'prethrow' });
+  const steps: { title: string; sub: string; status?: string; done?: boolean; dim?: boolean; tab: Target }[] = [];
+  if (goodsCount || me.is_pitcher) steps.push({ title: 'Pre-Throw', sub: d.goods.length ? `The Goods · ${gDay ? `Day ${gDay} · ` : ''}${goodsCount} items` : 'The Goods · nothing assigned yet', tab: 'throw#goods' });
   const td = throwToday?.day ?? null;
   if (me.is_pitcher || td) {
-    if (throwToday === undefined) steps.push({ title: 'Catch Play', sub: 'Loading…', dim: true, tab: 'throwing' });
-    else if (!throwToday.program) steps.push({ title: 'Catch Play', sub: 'No throwing program assigned yet', dim: true, tab: 'throwing' });
-    else if (!td || td.kind === 'Off') steps.push({ title: 'Catch Play', sub: td && /holiday|thanksgiving|christmas|new year/i.test(td.title + ' ' + (td.note ?? '')) ? 'Holiday · no throwing' : 'Off today · full rest', status: 'Off', dim: true, tab: 'throwing' });
+    if (throwToday === undefined) steps.push({ title: 'Catch Play', sub: 'Loading…', dim: true, tab: 'throw' });
+    else if (!throwToday.program) steps.push({ title: 'Catch Play', sub: 'No throwing program assigned yet', dim: true, tab: 'throw' });
+    else if (!td || td.kind === 'Off') steps.push({ title: 'Catch Play', sub: td && /holiday|thanksgiving|christmas|new year/i.test(td.title + ' ' + (td.note ?? '')) ? 'Holiday · no throwing' : 'Off today · full rest', status: 'Off', dim: true, tab: 'throw' });
     else steps.push({
       title: 'Catch Play', sub: [td.sp_title && td.sp_title !== td.title ? 'Live outing' : td.title, PLYO_LABEL[td.plyos]].join(' · '),
-      status: throwToday.log?.done ? 'Done' : dayChip(td), done: !!throwToday.log?.done, tab: 'throwing',
+      status: throwToday.log?.done ? 'Done' : dayChip(td), done: !!throwToday.log?.done, tab: 'throw',
     });
   }
   if (sprint) steps.push({
     title: `Sprints · ${sprint}`, sub: day!.sprints[week - 1].replace(/^\s*\d+\s*\/\s*10\s*:?\s*/, '') || 'Log your best rep',
-    status: bestToday != null ? `Best ${fmtTime(bestToday)}` : 'Log time', done: bestToday != null, tab: 'sprints',
+    status: bestToday != null ? `Best ${fmtTime(bestToday)}` : 'Log time', done: bestToday != null, tab: 'lift#sprints',
   });
   if (day) steps.push({
     title: liftTitle(day), sub: [d.sched!.block.name + ` · Wk ${week}`, day.prep?.name].filter(Boolean).join(' · '),
@@ -214,7 +215,7 @@ function CheckinCard({ me, day, onSaved }: { me: Person; day: string; onSaved: (
         <div className="row">
           <h2>Daily check-in</h2>
           <span style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-            <span className="pill-green">Checked in</span>
+            <span className="pill-green">✓ Done</span>
             <button className="link" onClick={startEdit}>Edit</button>
           </span>
         </div>
@@ -267,7 +268,7 @@ function Objectives({ me }: { me: Person }) {
 }
 
 /** The past 7 days at a glance: RPE colour and bodyweight per day. */
-function WeekStrip({ me, onProgress }: { me: Person; onProgress: () => void }) {
+function WeekStrip({ me }: { me: Person }) {
   const today = isoDay();
   const [rows, setRows] = useState<Checkin[] | null>(null);
   useEffect(() => { api.checkinHistory(me.id, 6).then(setRows).catch(() => setRows([])); }, [me.id]);
@@ -291,7 +292,6 @@ function WeekStrip({ me, onProgress }: { me: Person; onProgress: () => void }) {
           );
         })}
       </div>
-      <button className="link" style={{ alignSelf: 'flex-start', padding: 0 }} onClick={onProgress}>See your weight graph ›</button>
     </div>
   );
 }

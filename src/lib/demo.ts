@@ -243,6 +243,13 @@ export function demoApi(): Api & { signInAs(email: string): void; demoAccounts()
     async pushStatus() { return { athletes: load().people.filter(p => p.active && !p.is_coach).length, with_reminders: 0 }; },
     async restoreGoods(ids) { ids.forEach(i => goodsGone.delete(i)); return ids.length; },
     async listBlocks() { return structuredClone(await demoBlocks()); },
+    async copyBlock(blockId, name) {
+      const all = await demoBlocks();
+      const b = all.find(x => x.id === blockId); if (!b) throw new Error('No such block');
+      const c = structuredClone(b); c.id = uid(); c.name = name;
+      for (const d of c.days) { d.id = uid(); d.block_id = c.id; for (const e of d.exercises) { e.id = uid(); e.block_day_id = d.id; } }
+      all.push(c); return c.id;
+    },
     async updateBlockDay(id, patch) { for (const b of await demoBlocks()) for (const d of b.days) if (d.id === id) Object.assign(d, patch); },
     async updateBlockExercise(id, patch) {
       const lib = (await withLibrary()).exercises!;

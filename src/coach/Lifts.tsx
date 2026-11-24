@@ -114,6 +114,7 @@ function Blocks({ me, data, blocks, assignments, onChanged }: {
 
   // assigning
   const [start, setStart] = useState(nextMonday());
+  const [assigning, setAssigning] = useState(false);
   const [sel, setSel] = useState<string[]>([]);
   const [msg, setMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -124,11 +125,19 @@ function Blocks({ me, data, blocks, assignments, onChanged }: {
   const assigned = useMemo(() => block ? assignments.filter(a => a.block_id === block.id) : [], [assignments, block]);
   const starts = [...new Set(assigned.map(a => a.start_date))].sort();
   const [sure, setSure] = useState<string | null>(null);
+  const onBlock = new Set(assigned.map(a => a.person_id)).size;
+  // Default a new assignment to the block's main start date, so one more athlete joins the team's week.
+  const mainStart = starts.slice().sort((a, b) => assigned.filter(x => x.start_date === b).length - assigned.filter(x => x.start_date === a).length)[0];
 
   if (!block) return <div className="card small muted">No blocks yet.</div>;
   const assign = async () => {
     setBusy(true); setMsg(null);
-    try { const n = await api.assignBlock(block.id, sel, start); setMsg(`Assigned to ${n} athlete${n === 1 ? '' : 's'} starting ${prettyDay(start)}.`); setSel([]); onChanged(); }
+    try {
+      const n = await api.assignBlock(block.id, sel, start);
+      const skipped = sel.length - n;
+      setMsg(`Assigned ${n} athlete${n === 1 ? '' : 's'} starting ${prettyDay(start)}.${skipped ? ` ${skipped} already on this block (skipped).` : ''}`);
+      setSel([]); onChanged();
+    }
     catch (e) { setMsg((e as Error).message); }
     setBusy(false);
   };
@@ -146,6 +155,12 @@ function Blocks({ me, data, blocks, assignments, onChanged }: {
       <div className="chips">
         {Array.from({ length: block.weeks }, (_, i) => i + 1).map(w => <button key={w} className={`toggle ${w === week ? 'on' : ''}`} onClick={() => setWeek(w)}>Week {w}</button>)}
       </div>
+      {me.coach_can_edit && (
+        <div className="shared-banner">
+          <b>Editing {block.name}</b> · changes here show up for {onBlock ? `all ${onBlock} athlete${onBlock === 1 ? '' : 's'} on this block` : 'everyone you assign to it'}.
+          To change one player only, open his roster card → Lift block → Make his own copy.
+        </div>
+      )}
       <BlockPlanner me={me} block={block} week={week} onChanged={onChanged} />
 
       <div className="section-title">Assign {block.name}</div>
@@ -171,7 +186,9 @@ function Blocks({ me, data, blocks, assignments, onChanged }: {
             </div>
           );
         })}
-        {me.coach_can_edit ? (
+        {me.coach_can_edit && !assigning ? (
+          <button className="btn ghost" style={{ alignSelf: 'flex-start' }} onClick={() => { setStart(mainStart && mainStart >= addDays(isoDay(), -60) ? mainStart : nextMonday()); setMsg(null); setAssigning(true); }}>Assign athletes…</button>
+        ) : me.coach_can_edit ? (
           <>
             <label className="field" style={{ maxWidth: 220 }}>Week 1 starts (Monday)
               <input className="input" type="date" value={start} onChange={e => setStart(e.target.value)} />
@@ -192,7 +209,8 @@ function Blocks({ me, data, blocks, assignments, onChanged }: {
             <button className="btn" disabled={!sel.length || busy || isoWeekday(start) !== 1} onClick={assign}>
               {isoWeekday(start) !== 1 ? 'Pick a Monday' : `Assign to ${sel.length} athlete${sel.length === 1 ? '' : 's'}`}
             </button>
-            <span className="small muted">Anyone already on this block is skipped. To move one athlete to a new start date, remove his start on his roster card first.</span>
+            <span className="small muted">Anyone already on this block is skipped. To move one athlete to a new start date, remove his start first.</span>
+            <button className="btn ghost small" style={{ alignSelf: 'flex-start' }} onClick={() => { setAssigning(false); setSel([]); }}>Done</button>
           </>
         ) : <span className="small muted">You have view-only access.</span>}
       </div>

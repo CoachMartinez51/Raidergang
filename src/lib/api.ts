@@ -47,6 +47,8 @@ export interface Api {
   assignmentsFor(personId: string | null): Promise<Assignment[]>;
   assignBlock(blockId: string, personIds: string[], startDate: string): Promise<number>;
   endAssignment(id: string): Promise<void>;
+  /** Copy a whole lift block (days + exercises) under a new name. Returns the new block id. */
+  copyBlock(blockId: string, name: string): Promise<string>;
   rehabSwitches(personId: string | null): Promise<RehabSwitch[]>;
   setRehab(personId: string, blockExerciseId: string, on: boolean): Promise<void>;
   setLogs(opts: { personId?: string; from: string; to: string; blockExerciseIds?: string[] }): Promise<SetLog[]>;
@@ -243,6 +245,18 @@ function liveApi(sb: SupabaseClient): Api {
       const r = must(await sb.from('block_assignments').upsert(rows, { onConflict: 'block_id,person_id,start_date', ignoreDuplicates: true }).select('id')) as { id: string }[];
       return r.length;
     },
+    async copyBlock(blockId, name) {
+      const b = must(await sb.from('lift_blocks').select('*').eq('id', blockId).single()) as Record<string, unknown>;
+      const nb = must(await sb.from('lift_blocks').insert({ name, notes: b.notes, weeks: b.weeks, date_moves: b.date_moves }).select('id').single()) as { id: string };
+      const days = must(await sb.from('block_days').select('*').eq('block_id', blockId)) as Record<string, unknown>[];
+      for (const d of days) {
+        const { id: oldDay, block_id: _b, ...dayRest } = d;
+        const nd = must(await sb.from('block_days').insert({ ...dayRest, block_id: nb.id }).select('id').single()) as { id: string };
+        const ex = must(await sb.from('block_exercises').select('*').eq('block_day_id', oldDay as string)) as Record<string, unknown>[];
+        if (ex.length) must(await sb.from('block_exercises').insert(ex.map(({ id: _i, block_day_id: _d, created_at: _c, created_by: _cb, ...rest }) => ({ ...rest, block_day_id: nd.id }))).select('id'));
+      }
+      return nb.id;
+    },
     async endAssignment(id) { must(await sb.from('block_assignments').update({ active: false }).eq('id', id)); },
     async rehabSwitches(personId) {
       let q = sb.from('rehab_switches').select('*').eq('active', true);
@@ -391,7 +405,7 @@ let previewing = false;
 export function setPreviewing(on: boolean) { previewing = on; }
 const WRITES = new Set<string>([
   'signOut', 'addPerson', 'updatePerson', 'createGroup', 'setGroups', 'addGoal', 'saveCheckin',
-  'savePrep', 'updateBlockDay', 'updateBlockExercise', 'addBlockExercise', 'removeBlockExercise', 'assignBlock', 'endAssignment', 'setRehab', 'logSet', 'saveExercise', 'saveDrill',
+  'savePrep', 'updateBlockDay', 'updateBlockExercise', 'addBlockExercise', 'removeBlockExercise', 'assignBlock', 'endAssignment', 'copyBlock', 'setRehab', 'logSet', 'saveExercise', 'saveDrill',
   'updateVideo', 'rematchVideos', 'logSprint', 'removeSprint', 'prescribeGoods', 'removeGoods', 'clearGoods', 'restoreGoods', 'savePushSubscription', 'sendTestPush', 'saveThrowDay', 'copyThrowProgram', 'logThrow', 'setThrowProgram', 'setThrowVelo',
 ]);
 const fakeSaved = (row: object) => ({

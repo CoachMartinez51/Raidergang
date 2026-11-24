@@ -1,3 +1,4 @@
+import { CoachToday } from './Today';
 import { Throwing } from './Throwing';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { api, setPreviewing } from '../lib/api';
@@ -12,12 +13,12 @@ import { Lifts } from './Lifts';
 import { Videos } from './Videos';
 import { Sprints } from './Sprints';
 
-type Tab = 'checkins' | 'lifts' | 'throwing' | 'sprints' | 'videos' | 'roster' | 'library';
+type Tab = 'today' | 'checkins' | 'lifts' | 'throwing' | 'sprints' | 'videos' | 'roster' | 'library';
 
 export interface RosterData { people: Person[]; groups: Group[]; members: Membership[]; }
 
 export function CoachHome({ me }: { me: Person }) {
-  const [tab, setTab] = useState<Tab>('checkins');
+  const [tab, setTab] = useState<Tab>('today');
   const [data, setData] = useState<RosterData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<Person | 'new' | null>(null);
@@ -39,6 +40,7 @@ export function CoachHome({ me }: { me: Person }) {
     <div className="shell wide">
       <TopBar me={me} sub={`${access}${api.mode === 'demo' ? ' · Demo mode' : ''}`} />
       <div className="tabs">
+        <button className={`tab ${tab === 'today' ? 'on' : ''}`} onClick={() => setTab('today')}>Today</button>
         <button className={`tab ${tab === 'checkins' ? 'on' : ''}`} onClick={() => setTab('checkins')}>Check-ins</button>
         <button className={`tab ${tab === 'lifts' ? 'on' : ''}`} onClick={() => setTab('lifts')}>Lifts</button>
         <button className={`tab ${tab === 'throwing' ? 'on' : ''}`} onClick={() => setTab('throwing')}>Throwing</button>
@@ -58,7 +60,7 @@ export function CoachHome({ me }: { me: Person }) {
       </div>
       <div className="content">
         <ErrorMsg error={error} />
-        {tab === 'library' ? <Library me={me} /> : !data ? <div className="muted small">Loading…</div> : tab === 'lifts' ? <Lifts me={me} data={data} /> : tab === 'throwing' ? <Throwing me={me} data={data} /> : tab === 'videos' ? <Videos me={me} data={data} /> : tab === 'sprints' ? <Sprints me={me} data={data} /> : tab === 'checkins'
+        {tab === 'library' ? <Library me={me} /> : !data ? <div className="muted small">Loading…</div> : tab === 'today' ? <CoachToday me={me} data={data} onOpen={p => setEditing(p)} go={t => { setTab(t); window.scrollTo(0, 0); }} /> : tab === 'lifts' ? <Lifts me={me} data={data} /> : tab === 'throwing' ? <Throwing me={me} data={data} /> : tab === 'videos' ? <Videos me={me} data={data} /> : tab === 'sprints' ? <Sprints me={me} data={data} /> : tab === 'checkins'
           ? <CheckinBoard data={data} onOpen={p => setEditing(p)} />
           : <Roster me={me} data={data} onOpen={p => setEditing(p)} onAdd={() => setEditing('new')} />}
       </div>

@@ -98,8 +98,13 @@ function MeatshackCard({ me, day, week, date, data, onLogged }: {
       <div className="card" style={{ gap: 8 }}>
         <div className="row">
           <h2>The Meatshack</h2>
-          <span className="small muted">{day.label} · {prettyDay(date)}</span>
+          {(() => {
+            const total = day.exercises.reduce((n, e) => n + (prescription(e, week) ? (e.log_type === 'done' ? 1 : prescription(e, week)!.sets) : 0), 0);
+            const done = new Set(todays.filter(setHasValue).map(l => `${l.block_exercise_id}|${l.set_number}`)).size;
+            return total > 0 && done >= total ? <span className="pill-green">✓ Done</span> : <span className="small muted">{total ? `${done} / ${total} sets` : ''}</span>;
+          })()}
         </div>
+        <span className="small muted">{day.label} · {prettyDay(date)}</span>
         {day.notes && <div className="coach-note">{day.notes}</div>}
         {!loggable && <div className="small muted">Logging opens on {prettyDay(date)}.</div>}
       </div>

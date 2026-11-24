@@ -12,6 +12,8 @@ export function PlayerBlocks({ me, person }: { me: Person; person: Person }) {
   const [blocks, setBlocks] = useState<LiftBlock[]>([]);
   const [sure, setSure] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [copying, setCopying] = useState<string | null>(null);
+  const [msg, setMsg] = useState<string | null>(null);
   const load = () => Promise.all([api.assignmentsFor(person.id), api.listBlocks()])
     .then(([a, b]) => { setAsg(a.filter(x => x.active).sort((x, y) => y.start_date.localeCompare(x.start_date))); setBlocks(b); })
     .catch(e => setError((e as Error).message));
@@ -22,6 +24,18 @@ export function PlayerBlocks({ me, person }: { me: Person; person: Person }) {
   const now = scheduleFor(today, asg, blocks);
   const nextMon = addDays(today, ((8 - new Date(today + 'T12:00:00Z').getUTCDay()) % 7) || 7);
   const next = scheduleFor(nextMon, asg, blocks);
+  const makeCopy = async (a: Assignment) => {
+    const b = blocks.find(x => x.id === a.block_id); if (!b) return;
+    if (copying !== a.id) { setCopying(a.id); return; }
+    setError(null);
+    try {
+      const id = await api.copyBlock(b.id, `${b.name} · ${person.last_name}`);
+      await api.endAssignment(a.id);
+      await api.assignBlock(id, [person.id], a.start_date);
+      setCopying(null); setMsg(`${person.first_name} now has his own copy: "${b.name} · ${person.last_name}". Edit it in Lifts → Blocks; only he sees the changes.`);
+      await load();
+    } catch (e) { setError((e as Error).message); }
+  };
   const remove = async (id: string) => {
     if (sure !== id) { setSure(id); return; }
     setError(null);
@@ -51,10 +65,16 @@ export function PlayerBlocks({ me, person }: { me: Person; person: Person }) {
                 </div>
                 <span className="small muted">Starts {prettyDay(a.start_date, { weekday: 'short', month: 'short', day: 'numeric' })}
                   {a.start_date > today ? ' (hasn\'t started yet)' : wk ? ` · Week ${wk} now` : ' · finished'}</span>
+                {!ro && b && !b.name.endsWith(` · ${person.last_name}`) && (
+                  <button className="link-btn" style={{ alignSelf: 'flex-start', padding: 0 }} onClick={() => makeCopy(a)}>
+                    {copying === a.id ? `Tap again: copy ${b.name} just for ${person.first_name}` : 'Make his own copy'}
+                  </button>
+                )}
               </div>
             );
           })}
-          <div className="small muted">Removing a start doesn't delete anything he logged.</div>
+          {msg && <div className="small" style={{ color: 'var(--green-text)' }}>{msg}</div>}
+          <div className="small muted">Removing a start doesn't delete anything he logged. "Make his own copy" moves him to a private copy of the block (same start date), so you can change his lift without touching the team's. His past logs stay on the original.</div>
         </>
       )}
       <ErrorMsg error={error} />

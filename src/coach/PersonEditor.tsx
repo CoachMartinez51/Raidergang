@@ -14,6 +14,8 @@ import { RehabPanel } from './Lifts';
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const KINDS: [GoalKind, string][] = [['body', 'BODY'], ['ball', 'BALL'], ['game', 'GAME']];
 
+type PTab = 'info' | 'lift' | 'throw' | 'goods';
+
 export function PersonEditor({ me, person, data, onClose, onSaved }: {
   me: Person; person: Person | null; data: RosterData; onClose: () => void; onSaved: () => void;
 }) {
@@ -21,6 +23,7 @@ export function PersonEditor({ me, person, data, onClose, onSaved }: {
   const canEdit = me.coach_can_edit;
   const isAdmin = me.is_admin;
   const [d, setD] = useState<PersonDraft>(() => person ? { ...person } : emptyPerson());
+  const [ptab, setPtab] = useState<PTab>('info');
   const [aliases, setAliases] = useState((person?.aliases ?? []).join(', '));
   const [groupIds, setGroupIds] = useState<string[]>(() => person ? data.members.filter(m => m.person_id === person.id).map(m => m.group_id) : []);
   const [groups, setGroups] = useState(data.groups);
@@ -94,7 +97,15 @@ export function PersonEditor({ me, person, data, onClose, onSaved }: {
           <button className="btn ghost small close-btn" onClick={onClose}>Close</button>
         </div>
         {ro && <div className="msg info">You have view-only access.</div>}
+        {!isNew && (
+          <nav className="tabs tabs-even card-tabs" aria-label="Player sections">
+            {([['info', 'Info'], ['lift', 'Lift'], ...(person!.is_pitcher ? [['throw', 'Throw'], ['goods', 'Goods']] : [])] as [PTab, string][]).map(([k, l]) => (
+              <button key={k} className={`tab ${ptab === k ? 'on' : ''}`} onClick={() => setPtab(k)}>{l}</button>
+            ))}
+          </nav>
+        )}
 
+        {(isNew || ptab === 'info') && <>
         <div className="card">
           <div className="grid2">
             <label className="field">First name<input className="input" disabled={ro} value={d.first_name} onChange={e => set('first_name', e.target.value)} /></label>
@@ -108,9 +119,6 @@ export function PersonEditor({ me, person, data, onClose, onSaved }: {
           </label>
           <label className="field">Goal weight (optional)
             <input className="input" disabled={ro} placeholder="e.g. 204-207" value={d.goal_weight ?? ''} onChange={e => set('goal_weight', e.target.value)} />
-          </label>
-          <label className="field">Note at the top of their Goods (optional)
-            <textarea className="input" rows={2} maxLength={1000} disabled={ro} placeholder="e.g. Get after it this winter" value={d.goods_note ?? ''} onChange={e => set('goods_note', e.target.value)} />
           </label>
           <label className="field">Trackman pitcher ID (optional)
             <input className="input" disabled={ro} value={d.trackman_pitcher_id ?? ''} onChange={e => set('trackman_pitcher_id', e.target.value)} />
@@ -173,11 +181,6 @@ export function PersonEditor({ me, person, data, onClose, onSaved }: {
         {!valid && !ro && <span className="small muted">Needs a first and last name, a valid email, and at least one role.</span>}
 
         {!isNew && !person!.is_coach && <WeightChart personId={person!.id} goal={d.goal_weight} />}
-        {!isNew && !person!.is_coach && <PlayerBlocks me={me} person={person!} />}
-        {!isNew && !person!.is_coach && <LiftChart personId={person!.id} title="Lifts over time" />}
-        {!isNew && person!.is_pitcher && <PlayerThrowing me={me} person={person!} />}
-        {!isNew && person!.is_pitcher && <GoodsCard personId={person!.id} note={d.goods_note} editable={!ro} />}
-        {!isNew && !person!.is_coach && <RehabPanel me={me} person={person!} />}
 
         {!isNew && !d.is_coach && (
           <div className="card" style={{ gap: 8 }}>
@@ -193,6 +196,23 @@ export function PersonEditor({ me, person, data, onClose, onSaved }: {
             ))}
           </div>
         )}
+        </>}
+
+        {!isNew && ptab === 'lift' && <>
+          <PlayerBlocks me={me} person={person!} />
+          <LiftChart personId={person!.id} title="Lifts over time" />
+          <RehabPanel me={me} person={person!} />
+        </>}
+        {!isNew && ptab === 'throw' && <PlayerThrowing me={me} person={person!} />}
+        {!isNew && ptab === 'goods' && <>
+          <div className="card">
+            <label className="field">Note at the top of his Goods (optional)
+              <textarea className="input" rows={2} maxLength={1000} disabled={ro} placeholder="e.g. Get after it this winter" value={d.goods_note ?? ''} onChange={e => set('goods_note', e.target.value)} />
+            </label>
+            {!ro && (d.goods_note ?? '') !== (person!.goods_note ?? '') && <button className="btn small" style={{ alignSelf: 'flex-start' }} disabled={!valid || busy} onClick={save}>{busy ? 'Saving…' : 'Save note'}</button>}
+          </div>
+          <GoodsCard personId={person!.id} note={d.goods_note} editable={!ro} />
+        </>}
       </div>
     </div>
   );
