@@ -53,7 +53,7 @@ export function GoodsCard({ personId, title = 'The Goods', note, date, allDays }
   const day = allDays || !date ? pick : autoDay;
   useEffect(() => { api.currentGoods(personId).then(setItems).catch(() => setItems([])); }, [personId]);
   if (!items) return null;
-  const noteBox = note ? <div className="goods-note"><span className="goods-note-label">From your coach</span>{note}</div> : null;
+  const noteBox = note ? <div className="goods-note"><span className="goods-note-label">From Myles:</span>{note}</div> : null;
   if (!items.length) {
     return <div className="card"><h2>{title}</h2>{noteBox}<div className="small muted">Nothing assigned yet.</div></div>;
   }

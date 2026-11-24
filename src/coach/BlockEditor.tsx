@@ -102,7 +102,7 @@ export function WeekGrid({ me, block, week, onChanged }: { me: Person; block: Li
   );
 }
 
-function ExerciseEditor({ block, day, ex, week, library, onCancel, onSaved }: {
+export function ExerciseEditor({ block, day, ex, week, library, onCancel, onSaved }: {
   block: LiftBlock; day: BlockDay; ex: BlockExercise | null; week: number; library: Exercise[];
   onCancel: () => void; onSaved: (msg?: string) => void;
 }) {
@@ -194,7 +194,7 @@ function ExerciseEditor({ block, day, ex, week, library, onCancel, onSaved }: {
   );
 }
 
-function DayEditor({ block, day, week, onCancel, onSaved }: {
+export function DayEditor({ block, day, week, onCancel, onSaved }: {
   block: LiftBlock; day: BlockDay; week: number; onCancel: () => void; onSaved: (msg?: string) => void;
 }) {
   const [label, setLabel] = useState(day.label);

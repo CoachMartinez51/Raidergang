@@ -161,3 +161,16 @@ export function rxText(e: BlockExercise, week: number): string {
   const base = w.sets > 1 || /^\d/.test(w.reps) ? `${w.sets} x ${w.reps}` : w.reps;
   return [base, e.rir].filter(Boolean).join(' · ');
 }
+
+/** A, B, C… blocks from slots (A1, A2 → block A), in order. */
+export function groupBlocks<T extends { slot: string }>(items: T[]): { letter: string; items: T[] }[] {
+  const out: { letter: string; items: T[] }[] = [];
+  for (const it of items) {
+    const letter = (it.slot.match(/^[A-Za-z]+/)?.[0] ?? '?').toUpperCase();
+    const g = out.find(b => b.letter === letter);
+    if (g) g.items.push(it); else out.push({ letter, items: [it] });
+  }
+  return out;
+}
+/** How a block's exercises are paired, from how many it has. */
+export const pairing = (n: number) => (n >= 3 ? 'Circuit' : n === 2 ? 'Superset' : 'Straight sets');

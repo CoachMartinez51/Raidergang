@@ -199,7 +199,7 @@ select.input option { background: var(--card); }
 .preview-bar .btn { min-height: 44px; }
 
 .goods-note { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border-radius: 12px; background: var(--gold-soft); border: 1px solid #5A4A1C; font-size: 15px; line-height: 1.4; }
-.goods-note-label { font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--gold); }
+.goods-note-label { font-size: 13px; font-weight: 700; color: var(--gold); }
 
 /* ---- lift set rows ---- */
 .set-row { display: flex; flex-direction: column; gap: 6px; }
@@ -212,3 +212,34 @@ select.input option { background: var(--card); }
 
 .chart-tip { position: absolute; top: -6px; transform: translate(-50%, -100%); white-space: nowrap; pointer-events: none;
   background: var(--bg); border: 1px solid var(--line2); border-radius: 8px; padding: 5px 9px; font-size: 13px; }
+
+/* ---- athlete lift: blocks with space between, bigger type ---- */
+.lift-block { display: flex; gap: 12px; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 4px 16px 4px 14px; }
+.lift-block-bar { width: 4px; border-radius: 2px; background: var(--gold); margin: 14px 0; flex-shrink: 0; }
+.lift-block-body { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.lift-block-head { display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: 700; letter-spacing: 1.4px; color: var(--green-text); padding: 12px 0 4px; }
+.lift-block-head.as-button { width: 100%; background: none; border: none; font-family: inherit; text-align: left; padding: 14px 0; min-height: 48px; }
+.lift-ex + .lift-ex { border-top: 1px solid var(--line); }
+.lift-ex-head { width: 100%; background: none; border: none; color: var(--text); padding: 12px 0; display: flex; align-items: center; gap: 12px; text-align: left; font-family: inherit; min-height: 56px; }
+.lift-ex-slot { font-family: 'Space Grotesk', Inter, sans-serif; font-weight: 700; font-size: 19px; color: var(--gold); width: 34px; flex-shrink: 0; }
+.lift-ex-name { display: block; font-weight: 700; font-size: 18px; line-height: 1.25; }
+.lift-ex-rx { display: block; font-size: 15px; color: var(--muted); margin-top: 2px; }
+.coach-note { font-size: 15px; line-height: 1.5; padding: 12px 14px; border-radius: 12px; background: var(--gold-soft); }
+.set-label { font-size: 14px; }
+.set-inputs .input { height: 48px; font-size: 17px; }
+
+/* ---- coach: plan the lift by block ---- */
+.planner { display: flex; flex-direction: column; gap: 16px; }
+.plan-block { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 14px 18px; display: flex; flex-direction: column; gap: 6px; }
+.plan-block-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.plan-block-head h3 { margin: 0; font-family: 'Space Grotesk', Inter, sans-serif; font-size: 20px; }
+.plan-prep-row { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; border-top: 1px solid var(--line); font-size: 15px; }
+.plan-row { display: grid; grid-template-columns: 44px minmax(0, 2fr) 64px minmax(0, 1fr) 70px minmax(0, 1.4fr) 76px; gap: 8px; align-items: center; padding: 5px 0; }
+.plan-row .input { height: 42px; font-size: 15px; padding: 0 10px; }
+.plan-row-labels { font-size: 12px; color: var(--muted); padding: 2px 0 0; }
+@media (max-width: 760px) {
+  .plan-row { grid-template-columns: 40px 1fr 1fr 1fr; }
+  .plan-row > :nth-child(2) { grid-column: 2 / -1; }
+  .plan-row > :nth-child(6) { grid-column: 2 / -2; }
+  .plan-row-labels { display: none; }
+}

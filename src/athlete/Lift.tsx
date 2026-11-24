@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { api } from '../lib/api';
 import { addDays, isoDay, prettyDay } from '../lib/dates';
 import {
-  ALT_OPTIONS, amountMode, dateFor, exName, exVideo, isoWeekday, prescription, rxText, scheduleFor, setHasValue, setText, WEEKDAY_SHORT,
+  ALT_OPTIONS, amountMode, dateFor, groupBlocks, pairing, exName, exVideo, isoWeekday, prescription, rxText, scheduleFor, setHasValue, setText, WEEKDAY_SHORT,
   type AltOption, type Assignment, type BlockDay, type BlockExercise, type LiftBlock, type RehabSwitch, type Scheduled, type SetLog,
 } from '../lib/lifts';
 import type { Person } from '../lib/types';
@@ -83,34 +83,49 @@ function MeatshackCard({ me, day, week, date, data, onLogged }: {
   const todays = data.logs.filter(l => l.log_date === date);
   const loggable = canLogOn(date);
 
+  const blocks = groupBlocks(day.exercises.filter(e => prescription(e, week)));
+  const row = (e: BlockExercise) => (
+    <ExerciseRow key={e.id} me={me} e={e} week={week} date={date} loggable={loggable}
+      open={open === e.id} onToggle={() => setOpen(o => (o === e.id ? null : e.id))}
+      logs={todays.filter(l => l.block_exercise_id === e.id)}
+      history={data.logs.filter(l => l.log_date < date && (l.block_exercise_id === e.id || l.exercise_name === exName(e)))}
+      rehabOn={data.rehab.some(r => r.block_exercise_id === e.id)}
+      onLogged={onLogged} />
+  );
+
   return (
-    <div className="card" style={{ gap: 0 }}>
-      <div className="row" style={{ marginBottom: 6 }}>
-        <h2>The Meatshack</h2>
-        <span className="small muted">{day.label} · {prettyDay(date)}</span>
+    <>
+      <div className="card" style={{ gap: 8 }}>
+        <div className="row">
+          <h2>The Meatshack</h2>
+          <span className="small muted">{day.label} · {prettyDay(date)}</span>
+        </div>
+        {day.notes && <div className="coach-note">{day.notes}</div>}
+        {!loggable && <div className="small muted">Logging opens on {prettyDay(date)}.</div>}
       </div>
-      {day.notes && <div className="msg info" style={{ marginBottom: 8 }}>{day.notes}</div>}
-      {!loggable && <div className="small muted" style={{ marginBottom: 8 }}>Logging opens on {prettyDay(date)}.</div>}
-      <div style={{ borderTop: '1px solid var(--line)' }}>
-        <button onClick={() => setOpen(o => (o === 'prep' ? null : 'prep'))} style={{ width: '100%', background: 'none', border: 'none', color: 'var(--text)', padding: '12px 0', display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left' }}>
-          <span style={{ fontFamily: "'Space Grotesk', Inter, sans-serif", fontWeight: 700, color: 'var(--gold)', width: 26 }}>LP</span>
-          <span style={{ flex: 1 }}>
-            <span style={{ display: 'block', fontWeight: 600, fontSize: 15 }}>Lifting Prep</span>
-            <span className="small muted">{[day.prep?.name, day.focus === 'lower' && day.sprints[week - 1] ? 'Sprints' : null].filter(Boolean).join(' · ') || 'Before A1'}</span>
-          </span>
-          <span className="muted">{open === 'prep' ? '▾' : '▸'}</span>
-        </button>
-        {open === 'prep' && <div style={{ paddingBottom: 14 }}><PrepList day={day} week={week} /></div>}
+
+      <div className="lift-block">
+        <div className="lift-block-body">
+          <button className="lift-block-head as-button" onClick={() => setOpen(o => (o === 'prep' ? null : 'prep'))} aria-expanded={open === 'prep'}>
+            <span>LP · LIFTING PREP{day.prep?.name ? ` · ${day.prep.name.toUpperCase()}` : ''}</span>
+            <span className="muted">{open === 'prep' ? '▾' : '▸'}</span>
+          </button>
+          {open === 'prep' && <div style={{ paddingBottom: 12, fontSize: 16 }}><PrepList day={day} week={week} /></div>}
+        </div>
       </div>
-      {day.exercises.map(e => (
-        <ExerciseRow key={e.id} me={me} e={e} week={week} date={date} loggable={loggable}
-          open={open === e.id} onToggle={() => setOpen(o => (o === e.id ? null : e.id))}
-          logs={todays.filter(l => l.block_exercise_id === e.id)}
-          history={data.logs.filter(l => l.log_date < date && (l.block_exercise_id === e.id || l.exercise_name === exName(e)))}
-          rehabOn={data.rehab.some(r => r.block_exercise_id === e.id)}
-          onLogged={onLogged} />
+
+      {day.warmup && <div className="small muted" style={{ padding: '0 4px' }}>{day.warmup}</div>}
+
+      {blocks.map(b => (
+        <div key={b.letter} className="lift-block">
+          {b.items.length > 1 && <div className="lift-block-bar" aria-hidden="true" />}
+          <div className="lift-block-body">
+            <span className="lift-block-head">{b.letter} · {pairing(b.items.length).toUpperCase()}</span>
+            {b.items.map(row)}
+          </div>
+        </div>
       ))}
-    </div>
+    </>
   );
 }
 
@@ -145,12 +160,12 @@ function ExerciseRow({ me, e, week, date, loggable, open, onToggle, logs, histor
 
   if (!rx) return null;
   return (
-    <div style={{ borderTop: '1px solid var(--line)' }}>
-      <button onClick={onToggle} style={{ width: '100%', background: 'none', border: 'none', color: 'var(--text)', padding: '12px 0', display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left' }}>
-        <span style={{ fontFamily: "'Space Grotesk', Inter, sans-serif", fontWeight: 700, color: 'var(--gold)', width: 26 }}>{e.slot}</span>
+    <div className="lift-ex">
+      <button onClick={onToggle} aria-expanded={open} className="lift-ex-head">
+        <span className="lift-ex-slot">{e.slot}</span>
         <span style={{ flex: 1, minWidth: 0 }}>
-          <span style={{ display: 'block', fontWeight: 600, fontSize: 15 }}>{exName(e)}</span>
-          <span className="small muted">{rxText(e, week)}{rehabOn ? ' · REHAB' : ''}</span>
+          <span className="lift-ex-name">{exName(e)}</span>
+          <span className="lift-ex-rx">{rxText(e, week)}{amountMode(rx?.reps) === 'reps' ? ' · log your reps' : amountMode(rx?.reps) === 'seconds' ? ' · log your time' : ''}{rehabOn ? ' · REHAB' : ''}</span>
         </span>
         <span className="chip" style={complete ? { background: '#14241A', color: '#A9DDB5' } : undefined}>{complete ? 'Done' : `${doneCount}/${sets}`}</span>
         <span className="muted">{open ? '▾' : '▸'}</span>

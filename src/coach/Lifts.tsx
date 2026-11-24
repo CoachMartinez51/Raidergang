@@ -7,7 +7,7 @@ import {
 } from '../lib/lifts';
 import { fullName, type Person } from '../lib/types';
 import { ErrorMsg } from '../ui/common';
-import { WeekGrid } from './BlockEditor';
+import { BlockPlanner } from './BlockPlanner';
 import { PrintBlock } from '../ui/PrintBlock';
 import type { RosterData } from './CoachHome';
 
@@ -145,7 +145,7 @@ function Blocks({ me, data, blocks, assignments, onChanged }: {
       <div className="chips">
         {Array.from({ length: block.weeks }, (_, i) => i + 1).map(w => <button key={w} className={`toggle ${w === week ? 'on' : ''}`} onClick={() => setWeek(w)}>Week {w}</button>)}
       </div>
-      <WeekGrid me={me} block={block} week={week} onChanged={onChanged} />
+      <BlockPlanner me={me} block={block} week={week} onChanged={onChanged} />
 
       <div className="section-title">Assign {block.name}</div>
       <div className="card">
