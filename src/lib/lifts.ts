@@ -49,6 +49,10 @@ export interface LiftBlock {
   days: BlockDay[];
 }
 
+export type BlockDayPatch = Partial<Pick<BlockDay, 'label' | 'focus' | 'warmup' | 'sprints' | 'notes'>>;
+export type BlockExercisePatch = Partial<Pick<BlockExercise, 'slot' | 'sort_order' | 'exercise_id' | 'custom_name' | 'rir' | 'cue' | 'rehab' | 'log_type' | 'result_label' | 'weeks'>>;
+export type NewBlockExercise = Pick<BlockExercise, 'block_day_id' | 'slot' | 'sort_order' | 'exercise_id' | 'custom_name' | 'rir' | 'cue' | 'rehab' | 'log_type' | 'weeks'>;
+
 export interface Assignment { id: string; block_id: string; person_id: string; start_date: string; active: boolean }
 
 export interface SetLog {

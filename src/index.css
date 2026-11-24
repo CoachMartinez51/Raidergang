@@ -8,6 +8,9 @@
   --faint: #7D7B70;
   --gold: #E6B53E;
   --gold-soft: #241F12;
+  --green: #046A38;        /* Wright State green (PMS 349) */
+  --green-text: #5CC28D;   /* readable green on dark */
+  --green-soft: #0E2419;
   --red: #C0392B;
   font-family: Inter, system-ui, sans-serif;
   color: var(--text);
@@ -24,7 +27,7 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 
 .shell { max-width: 520px; margin: 0 auto; min-height: 100dvh; display: flex; flex-direction: column; }
 .shell.wide { max-width: 1100px; }
-.topbar { padding: calc(env(safe-area-inset-top) + 16px) 20px 12px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--line); gap: 12px; }
+.topbar { padding: calc(env(safe-area-inset-top) + 16px) 20px 12px; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--green); gap: 12px; }
 .topbar .logo { height: 34px; width: auto; display: block; margin-bottom: 4px; }
 .sub { font-size: 12px; color: var(--muted); }
 .avatar { width: 36px; height: 36px; border-radius: 18px; background: var(--line); display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; border: none; color: var(--text); flex-shrink: 0; }
@@ -32,7 +35,7 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 
 .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
 .card h2 { margin: 0; font-family: 'Space Grotesk', sans-serif; font-size: 17px; }
-.section-title { font-family: 'Space Grotesk', sans-serif; font-size: 13px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); margin: 6px 2px 0; }
+.section-title { font-family: 'Space Grotesk', sans-serif; font-size: 13px; letter-spacing: 1px; text-transform: uppercase; color: var(--green-text); margin: 6px 2px 0; }
 .row { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
 
 .field { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--muted); }
@@ -129,3 +132,32 @@ select.input option { background: var(--card); }
 .sprint-pr { display: flex; flex-direction: column; gap: 2px; padding: 10px; border: 1px solid var(--line); border-radius: 10px; cursor: pointer; }
 .sprint-pr.on { border-color: var(--gold); }
 .sprint-pr .pr-time { font-family: 'Space Grotesk', Inter, sans-serif; font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+/* ---- athlete tabs / Today ---- */
+.agenda-step { display: flex; align-items: center; gap: 12px; width: 100%; padding: 13px 0; background: none; border: none; border-top: 1px solid var(--line); color: var(--text); text-align: left; font-family: inherit; min-height: 56px; }
+.agenda-step:first-of-type { border-top: none; }
+.step-num { width: 30px; height: 30px; border-radius: 15px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-family: 'Space Grotesk', Inter, sans-serif; font-weight: 700; font-size: 14px; background: var(--line); color: var(--text); }
+.step-num.first { background: var(--gold); color: #111; }
+.step-num.done { background: var(--green); color: #fff; }
+.step-title { display: block; font-size: 16px; font-weight: 600; }
+.step-status { flex-shrink: 0; font-size: 12px; font-weight: 600; padding: 4px 9px; border-radius: 999px; background: var(--line); color: var(--muted); }
+.step-status.done { background: var(--green-soft); color: var(--green-text); }
+.pill-green { font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 999px; background: var(--green-soft); color: var(--green-text); }
+.pill-soft { font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 999px; background: var(--line); color: var(--muted); }
+.next-btn { background: var(--gold-soft); color: var(--text); border: 1px solid var(--gold); }
+.week-strip { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; text-align: center; }
+.week-day { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+.week-rpe { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; }
+.week-rpe.empty { border: 1px dashed var(--line2); }
+
+/* ---- coach week grid ---- */
+.week-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 12px; align-items: start; }
+.grid-day { gap: 0; padding: 12px; }
+.grid-day-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; width: 100%; background: none; border: none; color: var(--text); font-family: inherit; font-size: 15px; padding: 2px 0 10px; text-align: left; }
+.grid-line { display: flex; align-items: center; gap: 8px; width: 100%; background: none; border: none; border-top: 1px solid var(--line); color: var(--text); font-family: inherit; font-size: 14px; padding: 9px 0; text-align: left; }
+.grid-cell { display: flex; align-items: flex-start; gap: 10px; width: 100%; background: none; border: none; border-top: 1px solid var(--line); color: var(--text); font-family: inherit; font-size: 14px; padding: 9px 4px; text-align: left; border-radius: 8px; }
+.grid-cell.on { background: var(--gold-soft); }
+.grid-cell.off { opacity: 0.55; }
+.grid-cell:disabled, .grid-line:disabled, .grid-day-head:disabled { cursor: default; }
+.grid-slot { width: 26px; flex-shrink: 0; font-family: 'Space Grotesk', Inter, sans-serif; font-weight: 700; color: var(--gold); }
+.grid-editor { margin-top: 10px; padding: 12px; border-radius: 12px; border: 1px solid var(--gold); background: var(--bg); }

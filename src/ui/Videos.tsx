@@ -41,12 +41,13 @@ export function VideoRow({ v, open, onToggle, extra }: { v: Video; open: boolean
 }
 
 /** Athlete home: their own bullpen videos, newest first. */
-export function MyVideos({ personId }: { personId: string }) {
+export function MyVideos({ personId, showEmpty }: { personId: string; showEmpty?: boolean }) {
   const [rows, setRows] = useState<Video[] | null>(null);
   const [open, setOpen] = useState<string | null>(null);
   const [all, setAll] = useState(false);
   useEffect(() => { api.listVideos(personId).then(setRows).catch(() => setRows([])); }, [personId]);
-  if (!rows || !rows.length) return null;
+  if (!rows) return null;
+  if (!rows.length) return showEmpty ? <div className="card"><h2>Your videos</h2><div className="small muted">No videos yet. Bullpens filmed on @WrightStatePitching show up here.</div></div> : null;
   const shown = all ? rows : rows.slice(0, 4);
   return (
     <>

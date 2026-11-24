@@ -153,7 +153,26 @@ export function demoApi(): Api & { signInAs(email: string): void; demoAccounts()
         mk('any', 'half_plyos', 'Deadman Throws', '1-2 x 5-8', 0, 'Yellow, Red'), mk('any', 'full_plyos', 'Drop Step on Mound', '1-2 x 5-8', 0, 'Red, White, Grey'),
       ];
     },
-    async listBlocks() { return demoBlocks(); },
+    async listBlocks() { return structuredClone(await demoBlocks()); },
+    async updateBlockDay(id, patch) { for (const b of await demoBlocks()) for (const d of b.days) if (d.id === id) Object.assign(d, patch); },
+    async updateBlockExercise(id, patch) {
+      const lib = (await withLibrary()).exercises!;
+      for (const b of await demoBlocks()) for (const d of b.days) for (const e of d.exercises) if (e.id === id) {
+        Object.assign(e, patch);
+        if ('exercise_id' in patch) { const x = lib.find(l => l.id === patch.exercise_id); e.exercise = x ? { name: x.name, video_url: x.video_url } : null; }
+      }
+    },
+    async addBlockExercise(row) {
+      const lib = (await withLibrary()).exercises!;
+      const x = lib.find(l => l.id === row.exercise_id);
+      for (const b of await demoBlocks()) for (const d of b.days) if (d.id === row.block_day_id)
+        d.exercises.push({ ...row, id: uid(), video_url: null, result_label: null, exercise: x ? { name: x.name, video_url: x.video_url } : null });
+    },
+    async removeBlockExercise(id) {
+      const d0 = await withLifts();
+      if (d0.setLogs!.some(l => l.block_exercise_id === id)) throw new Error("Athletes already logged sets on this exercise, so it can't be removed. Swap the exercise instead.");
+      for (const b of await demoBlocks()) for (const d of b.days) d.exercises = d.exercises.filter(e => e.id !== id);
+    },
     async savePrep(_block, day, items) {
       const prep = { id: day.prep_id ?? uid(), name: day.prep?.name ?? 'Lifting Prep', items };
       for (const b of await demoBlocks()) for (const d of b.days) if (d.id === day.id) { d.prep = prep; d.prep_id = prep.id; }

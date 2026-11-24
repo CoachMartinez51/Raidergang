@@ -3,6 +3,7 @@ import type { Category, Checkin, GoodsItem, Drill, DrillDraft, Exercise, Exercis
 import { demoApi } from './demo';
 import { addDays, isoDay } from './dates';
 import type { SprintResult, SprintSession, SprintType } from './sprints';
+import type { BlockDayPatch, BlockExercisePatch, NewBlockExercise } from './lifts';
 import type { Assignment, BlockDay, LiftBlock, LiftPrep, PrepItem, RehabSwitch, SetLog } from './lifts';
 
 export interface Api {
@@ -36,6 +37,12 @@ export interface Api {
 
   listBlocks(): Promise<LiftBlock[]>;
   savePrep(block: LiftBlock, day: BlockDay, items: PrepItem[]): Promise<LiftPrep>;
+  /** Coach block editing */
+  updateBlockDay(id: string, patch: BlockDayPatch): Promise<void>;
+  updateBlockExercise(id: string, patch: BlockExercisePatch): Promise<void>;
+  addBlockExercise(row: NewBlockExercise): Promise<void>;
+  /** Refuses if athletes already logged sets on it (those logs would be lost). */
+  removeBlockExercise(id: string): Promise<void>;
   assignmentsFor(personId: string | null): Promise<Assignment[]>;
   assignBlock(blockId: string, personIds: string[], startDate: string): Promise<number>;
   endAssignment(id: string): Promise<void>;
@@ -177,6 +184,21 @@ function liveApi(sb: SupabaseClient): Api {
       must(await sb.from('block_days').update({ prep_id: prep.id }).eq('id', day.id));
       return prep;
     },
+    async updateBlockDay(id, patch) {
+      const rows = must(await sb.from('block_days').update(patch).eq('id', id).select('id')) as { id: string }[];
+      if (!rows.length) throw new Error('You do not have permission to edit this lift.');
+    },
+    async updateBlockExercise(id, patch) {
+      const rows = must(await sb.from('block_exercises').update(patch).eq('id', id).select('id')) as { id: string }[];
+      if (!rows.length) throw new Error('You do not have permission to edit this lift.');
+    },
+    async addBlockExercise(row) { must(await sb.from('block_exercises').insert(row).select('id')); },
+    async removeBlockExercise(id) {
+      const r = await sb.from('set_logs').select('id', { count: 'exact', head: true }).eq('block_exercise_id', id);
+      if (r.error) throw new Error(r.error.message);
+      if ((r.count ?? 0) > 0) throw new Error(`Athletes already logged ${r.count} set${r.count === 1 ? '' : 's'} on this exercise, so it can't be removed. Swap the exercise instead, or set it to 0 sets for the weeks you don't want it.`);
+      must(await sb.from('block_exercises').delete().eq('id', id).select('id'));
+    },
     async assignmentsFor(personId) {
       let q = sb.from('block_assignments').select('*').eq('active', true);
       if (personId) q = q.eq('person_id', personId);
@@ -271,7 +293,7 @@ let previewing = false;
 export function setPreviewing(on: boolean) { previewing = on; }
 const WRITES = new Set<string>([
   'signOut', 'addPerson', 'updatePerson', 'createGroup', 'setGroups', 'addGoal', 'saveCheckin',
-  'savePrep', 'assignBlock', 'endAssignment', 'setRehab', 'logSet', 'saveExercise', 'saveDrill',
+  'savePrep', 'updateBlockDay', 'updateBlockExercise', 'addBlockExercise', 'removeBlockExercise', 'assignBlock', 'endAssignment', 'setRehab', 'logSet', 'saveExercise', 'saveDrill',
   'updateVideo', 'rematchVideos', 'logSprint', 'removeSprint',
 ]);
 const fakeSaved = (row: object) => ({
