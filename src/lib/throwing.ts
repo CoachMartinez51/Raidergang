@@ -66,3 +66,29 @@ export function shortTitle(d: ThrowDay) {
   if (/catch/i.test(d.title)) return 'Catch';
   return d.title.slice(0, 10);
 }
+
+/** Before this date days aren't classified by intent: athletes see distance + plyos only. */
+export const INTENSITY_FROM = '2027-01-11';
+export const showIntensity = (day: string) => day >= INTENSITY_FROM;
+/** Color class for a day: Off / Recovery keep theirs; throwing days are neutral until intensities start. */
+export function dayCls(d: Pick<ThrowDay, 'day' | 'kind'>) {
+  if (showIntensity(d.day) || d.kind === 'Off' || d.kind === 'Recovery') return KINDS[d.kind].cls;
+  return 'k-throw';
+}
+export function dayChip(d: Pick<ThrowDay, 'day' | 'kind'>) {
+  if (showIntensity(d.day) || d.kind === 'Off' || d.kind === 'Recovery') return KINDS[d.kind].label;
+  return 'Throw';
+}
+
+/** An athlete's check-off for a throwing day. The latest saved row for a day counts. */
+export interface ThrowLog {
+  id: string;
+  person_id: string;
+  day: string;
+  program_id: string | null;
+  title: string | null;
+  done: boolean;
+  feel: string | null;
+  created_at: string;
+}
+export type NewThrowLog = Pick<ThrowLog, 'person_id' | 'day' | 'program_id' | 'title' | 'done' | 'feel'>;

@@ -339,3 +339,9 @@ select.input option { background: var(--card); }
 .chart-legend span { display: inline-flex; align-items: center; gap: 6px; }
 .chart-legend i { width: 16px; height: 3px; border-radius: 2px; display: inline-block; }
 .chart-legend i.dash { background: repeating-linear-gradient(90deg, var(--green-text) 0 5px, transparent 5px 9px); }
+.k-throw { background: #1C2A33; color: #A9D3F0; }
+.throw-log .feel { font-size: 15px; line-height: 1.45; padding: 10px 12px; border-radius: 10px; background: var(--bg); border: 1px solid var(--line); }
+.check-row { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 12px; border: 1px solid var(--line2); font-size: 16px; font-weight: 600; cursor: pointer; }
+.check-row input { width: 24px; height: 24px; accent-color: var(--green); }
+.log-row { display: flex; flex-direction: column; gap: 4px; padding: 10px 0; border-top: 1px solid var(--line); }
+.log-row .feel { font-size: 14px; line-height: 1.45; padding: 8px 10px; border-radius: 10px; background: var(--bg); border: 1px solid var(--line); }

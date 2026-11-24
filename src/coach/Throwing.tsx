@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../lib/api';
 import { addDays, isoDay, prettyDay } from '../lib/dates';
-import { intensityText, KIND_ORDER, KINDS, mondayOf, PLYO_LABEL, shortTitle, type Plyos, type ThrowAssignment, type ThrowDay, type ThrowDayDraft, type ThrowKind, type ThrowProgram } from '../lib/throwing';
+import { dayChip, dayCls, INTENSITY_FROM, intensityText, KIND_ORDER, KINDS, mondayOf, PLYO_LABEL, shortTitle, showIntensity, type ThrowLog, type Plyos, type ThrowAssignment, type ThrowDay, type ThrowDayDraft, type ThrowKind, type ThrowProgram } from '../lib/throwing';
 import { fullName, type Person } from '../lib/types';
 import { ErrorMsg } from '../ui/common';
 import type { RosterData } from './CoachHome';
@@ -18,7 +18,7 @@ export function Throwing({ me, data }: { me: Person; data: RosterData }) {
   const [start, setStart] = useState(mondayOf(isoDay()));
   const [days, setDays] = useState<Map<string, ThrowDay>>(new Map());
   const [sel, setSel] = useState<string | null>(null);
-  const [view, setView] = useState<'calendar' | 'assign'>('calendar');
+  const [view, setView] = useState<'calendar' | 'logs' | 'assign'>('calendar');
   const [error, setError] = useState<string | null>(null);
 
   const reloadMeta = () => Promise.all([api.throwPrograms(), api.throwAssignments()]).then(([p, a]) => {
@@ -52,13 +52,16 @@ export function Throwing({ me, data }: { me: Person; data: RosterData }) {
         <h2 style={{ margin: 0, fontFamily: "'Space Grotesk', Inter, sans-serif", fontSize: 22 }}>Throwing programs</h2>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button className={`toggle ${view === 'calendar' ? 'on' : ''}`} onClick={() => setView('calendar')}>Calendar</button>
+          <button className={`toggle ${view === 'logs' ? 'on' : ''}`} onClick={() => setView('logs')}>Logs</button>
           <button className={`toggle ${view === 'assign' ? 'on' : ''}`} onClick={() => setView('assign')}>Assign pitchers · velo</button>
           {!ro && view === 'calendar' && program && <button className="btn ghost small" onClick={copy}>Copy {program.name}…</button>}
         </div>
       </div>
       <ErrorMsg error={error} />
 
-      {view === 'assign' ? (
+      {view === 'logs' ? (
+        <LogsView data={data} programs={programs} assign={assign} />
+      ) : view === 'assign' ? (
         <AssignView ro={ro} data={data} programs={programs} assign={assign} onChanged={reloadMeta} />
       ) : (
         <>
@@ -82,10 +85,10 @@ export function Throwing({ me, data }: { me: Person; data: RosterData }) {
               {Array.from({ length: WEEKS * 7 }, (_, i) => addDays(start, i)).map(iso => {
                 const d = days.get(iso);
                 return (
-                  <button key={iso} className={`tcell ${d ? KINDS[d.kind].cls : 'k-none'} ${iso === sel ? 'sel' : ''}`} onClick={() => setSel(iso)}>
-                    <span className="tc-top"><b>{prettyDay(iso, { month: 'numeric', day: 'numeric' })}</b>{d && <span>{KINDS[d.kind].label}</span>}</span>
+                  <button key={iso} className={`tcell ${d ? dayCls(d) : 'k-none'} ${iso === sel ? 'sel' : ''}`} onClick={() => setSel(iso)}>
+                    <span className="tc-top"><b>{prettyDay(iso, { month: 'numeric', day: 'numeric' })}</b>{d && <span>{dayChip(d)}</span>}</span>
                     <span className="tc-title">{d ? (d.sp_title && d.sp_title !== d.title ? 'Live (RP / SP)' : d.title) : '—'}</span>
-                    {d && (d.distance || d.catch_play) && <span className="tc-sub">{[d.distance, d.kind !== 'Off' ? intensityText(d.kind) : null].filter(Boolean).join(' · ')}</span>}
+                    {d && (d.distance || d.catch_play) && <span className="tc-sub">{[d.distance, d.kind !== 'Off' && showIntensity(d.day) ? intensityText(d.kind) : null].filter(Boolean).join(' · ')}</span>}
                     {d && d.plyos !== 'none' && <span className="tc-ply">{PLYO_LABEL[d.plyos]}</span>}
                   </button>
                 );
@@ -170,7 +173,9 @@ export function DayEditor({ ro, program, date, day, onSaved, onClose }: {
       <label className="field">Note
         <textarea className="input" rows={2} disabled={ro} maxLength={500} value={d.note ?? ''} onChange={e => set('note', e.target.value)} />
       </label>
-      <div className="small muted">Intensity for this type: {intensityText(d.kind) ?? 'none'} of each pitcher's average fastball. Athletes see their own mph.</div>
+      <div className="small muted">{showIntensity(date)
+        ? `Intensity for this type: ${intensityText(d.kind) ?? 'none'} of each pitcher's average fastball. Athletes see their own mph.`
+        : `Before ${prettyDay(INTENSITY_FROM, { month: 'short', day: 'numeric' })} athletes only see the title, distance, catch play and plyos (no intensity). The type still sets plyos and Off days.`}</div>
       <ErrorMsg error={error} />
       {!ro && (
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -273,6 +278,8 @@ export function PlayerThrowing({ me, person }: { me: Person; person: Person }) {
   }).catch(e => setError((e as Error).message));
   useEffect(() => { load(); }, [person.id]);
   const end = addDays(start, 13);
+  const [recent, setRecent] = useState<ThrowLog[]>([]);
+  useEffect(() => { api.throwLogs({ personId: person.id, from: addDays(isoDay(), -20), to: isoDay() }).then(setRecent).catch(() => setRecent([])); }, [person.id]);
   useEffect(() => {
     if (!pid) { setDays(new Map()); return; }
     api.throwDays(pid, start, end).then(r => setDays(new Map(r.map(d => [d.day, d])))).catch(e => setError((e as Error).message));
@@ -336,7 +343,7 @@ export function PlayerThrowing({ me, person }: { me: Person; person: Person }) {
             {Array.from({ length: 14 }, (_, i) => addDays(start, i)).map(iso => {
               const d = days.get(iso);
               return (
-                <button key={iso} className={`pt-cell ${d ? KINDS[d.kind].cls : 'k-none'} ${iso === sel ? 'sel' : ''} ${iso === isoDay() ? 'today' : ''}`} onClick={() => setSel(iso)}
+                <button key={iso} className={`pt-cell ${d ? dayCls(d) : 'k-none'} ${iso === sel ? 'sel' : ''} ${iso === isoDay() ? 'today' : ''}`} onClick={() => setSel(iso)}
                   aria-label={`${prettyDay(iso)}: ${d ? d.title : 'nothing planned'}`}>
                   <b>{Number(iso.slice(8))}</b><span>{d ? shortTitle(d) : '–'}</span>
                 </button>
@@ -347,6 +354,65 @@ export function PlayerThrowing({ me, person }: { me: Person; person: Person }) {
             onSaved={d => setDays(m => new Map(m).set(d.day, d))} onClose={() => setSel(null)} />}
         </>
       )}
+      <div className="small muted" style={{ letterSpacing: 1, textTransform: 'uppercase', marginTop: 4 }}>His throw logs · last 3 weeks</div>
+      {!recent.length ? <div className="small muted">Nothing logged yet.</div> : recent.map(l => (
+        <div key={l.id} className="log-row">
+          <div className="row"><span style={{ fontWeight: 600 }}>{prettyDay(l.day, { weekday: 'short', month: 'short', day: 'numeric' })}</span>
+            {l.done ? <span className="pill-green">✓ Done</span> : <span className="pill-soft">Not done</span>}</div>
+          {l.title && <span className="small muted">{l.title}</span>}
+          {l.feel && <div className="feel">"{l.feel}"</div>}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Who threw on a day and how it felt, from the athletes' check-offs. */
+function LogsView({ data, programs, assign }: { data: RosterData; programs: ThrowProgram[]; assign: ThrowAssignment[] }) {
+  const [day, setDay] = useState(isoDay());
+  const [logs, setLogs] = useState<ThrowLog[] | null>(null);
+  const [plan, setPlan] = useState<Map<string, ThrowDay>>(new Map());
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    setLogs(null);
+    Promise.all([
+      api.throwLogs({ personId: null, from: day, to: day }),
+      Promise.all(programs.map(p => api.throwDays(p.id, day, day))),
+    ]).then(([l, ds]) => { setLogs(l); setPlan(new Map(ds.flat().map(d => [d.program_id, d]))); })
+      .catch(e => setError((e as Error).message.includes('throw_logs') ? 'Run stage14_throw_logs.sql in Supabase to turn on throw logs.' : (e as Error).message));
+  }, [day, programs]);
+
+  const pitchers = data.people.filter(p => p.active && !p.is_coach && p.is_pitcher).sort((a, b) => a.last_name.localeCompare(b.last_name));
+  const rows = pitchers.map(p => {
+    const pid = assign.find(a => a.person_id === p.id)?.program_id ?? null;
+    return { p, d: pid ? plan.get(pid) ?? null : null, log: logs?.find(l => l.person_id === p.id) ?? null };
+  });
+  const throwing = rows.filter(r => r.d && r.d.kind !== 'Off');
+  const doneN = throwing.filter(r => r.log?.done).length;
+  const extra = rows.filter(r => !(r.d && r.d.kind !== 'Off') && r.log);
+
+  return (
+    <div className="card" style={{ gap: 8 }}>
+      <div className="row" style={{ justifyContent: 'flex-start', gap: 8, flexWrap: 'wrap' }}>
+        <button className="btn ghost small" aria-label="Day before" onClick={() => setDay(d => addDays(d, -1))}>‹</button>
+        <b>{prettyDay(day, { weekday: 'short', month: 'short', day: 'numeric' })}</b>
+        <button className="btn ghost small" aria-label="Day after" onClick={() => setDay(d => addDays(d, 1))}>›</button>
+        {day !== isoDay() && <button className="btn ghost small" onClick={() => setDay(isoDay())}>Today</button>}
+        {logs && <span className="small muted" style={{ marginLeft: 'auto' }}>{doneN} of {throwing.length} throwing pitchers checked off</span>}
+      </div>
+      <ErrorMsg error={error} />
+      {!logs ? <div className="small muted">Loading…</div> : !throwing.length && !extra.length ? (
+        <div className="small muted">Nobody is scheduled to throw this day.</div>
+      ) : [...throwing, ...extra].map(({ p, d, log }) => (
+        <div key={p.id} className="log-row">
+          <div className="row">
+            <span style={{ fontWeight: 600 }}>{fullName(p)}</span>
+            {log ? (log.done ? <span className="pill-green">✓ Done</span> : <span className="pill-soft">Not done</span>) : <span className="small muted">Not logged</span>}
+          </div>
+          <span className="small muted">{d ? `${d.kind === 'Off' ? 'Off day' : d.title} · ${PLYO_LABEL[d.plyos]}` : log?.title ?? ''}</span>
+          {log?.feel && <div className="feel">"{log.feel}"</div>}
+        </div>
+      ))}
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import type { ThrowAssignment, ThrowDay, ThrowDayDraft, ThrowProgram } from './throwing';
+import type { NewThrowLog, ThrowAssignment, ThrowDay, ThrowDayDraft, ThrowLog, ThrowProgram } from './throwing';
 import type { Category, Checkin, GoodsItem, GoodsSection, Drill, DrillDraft, Exercise, ExerciseDraft, Goal, GoalKind, Group, LibrarySync, Membership, NewGoodsItem, Person, PersonDraft, Video, VideoPatch } from './types';
 import { demoApi } from './demo';
 import { addDays, isoDay } from './dates';
@@ -72,6 +72,9 @@ export interface Api {
   throwAssignments(): Promise<ThrowAssignment[]>;
   setThrowProgram(personId: string, programId: string | null): Promise<void>;
   setThrowVelo(personId: string, mph: number | null): Promise<void>;
+  /** Throw check-offs (latest per person per day). personId null = everyone (coaches). */
+  throwLogs(opts: { personId: string | null; from: string; to: string }): Promise<ThrowLog[]>;
+  logThrow(row: NewThrowLog): Promise<ThrowLog>;
   /** The athlete's current program and its days in a date range. */
   myThrowing(personId: string, from: string, to: string): Promise<{ program: ThrowProgram | null; days: ThrowDay[] }>;
   /** 11 AM reminder */
@@ -308,6 +311,12 @@ function liveApi(sb: SupabaseClient): Api {
     },
     async setThrowProgram(personId, programId) { must(await sb.rpc('set_throw_program', { p_person: personId, p_program: programId })); },
     async setThrowVelo(personId, mph) { must(await sb.from('people').update({ throw_velo: mph }).eq('id', personId).select('id')); },
+    async throwLogs({ personId, from, to }) {
+      let q = sb.from('current_throw_logs').select('*').gte('day', from).lte('day', to);
+      if (personId) q = q.eq('person_id', personId);
+      return must(await q.order('day', { ascending: false }).range(0, 4999)) as ThrowLog[];
+    },
+    async logThrow(row) { return must(await sb.from('throw_logs').insert(row).select().single()) as ThrowLog; },
     async myThrowing(personId, from, to) {
       const a = must(await sb.from('throw_assignments').select('program_id, throw_programs(id, name, active)').eq('person_id', personId).is('retired_at', null).maybeSingle()) as { program_id: string; throw_programs: ThrowProgram } | null;
       if (!a) return { program: null, days: [] };
@@ -379,7 +388,7 @@ export function setPreviewing(on: boolean) { previewing = on; }
 const WRITES = new Set<string>([
   'signOut', 'addPerson', 'updatePerson', 'createGroup', 'setGroups', 'addGoal', 'saveCheckin',
   'savePrep', 'updateBlockDay', 'updateBlockExercise', 'addBlockExercise', 'removeBlockExercise', 'assignBlock', 'endAssignment', 'setRehab', 'logSet', 'saveExercise', 'saveDrill',
-  'updateVideo', 'rematchVideos', 'logSprint', 'removeSprint', 'prescribeGoods', 'removeGoods', 'clearGoods', 'restoreGoods', 'savePushSubscription', 'sendTestPush', 'saveThrowDay', 'copyThrowProgram', 'setThrowProgram', 'setThrowVelo',
+  'updateVideo', 'rematchVideos', 'logSprint', 'removeSprint', 'prescribeGoods', 'removeGoods', 'clearGoods', 'restoreGoods', 'savePushSubscription', 'sendTestPush', 'saveThrowDay', 'copyThrowProgram', 'logThrow', 'setThrowProgram', 'setThrowVelo',
 ]);
 const fakeSaved = (row: object) => ({
   id: `preview-${Math.random().toString(36).slice(2)}`, created_at: new Date().toISOString(),

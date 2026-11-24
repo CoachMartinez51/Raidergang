@@ -5,7 +5,7 @@ import type { Api } from './api';
 import type { Assignment, LiftBlock, RehabSwitch, SetLog } from './lifts';
 import type { Category, Checkin, GoodsItem, Drill, Exercise, Goal, Group, Membership, Person } from './types';
 import { addDays, isoDay } from './dates';
-import { KINDS, type ThrowDay, type ThrowKind, type ThrowProgram } from './throwing';
+import { KINDS, type ThrowDay, type ThrowKind, type ThrowLog, type ThrowProgram } from './throwing';
 
 const KEY = 'raidergang-demo-v1';
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2));
@@ -78,6 +78,7 @@ const throwProgramsDemo: ThrowProgram[] = [{ id: 'trk-a', name: 'Track A', activ
 const throwDaysDemo = new Map<string, ThrowDay>();   // key program|day
 const throwAssignDemo = new Map<string, string>();   // person -> program
 const throwVeloDemo = new Map<string, number | null>();
+const throwLogsDemo: ThrowLog[] = [];
 function demoThrowDay(programId: string, day: string): ThrowDay | null {
   const k = `${programId}|${day}`;
   if (throwDaysDemo.has(k)) return throwDaysDemo.get(k)!;
@@ -224,6 +225,12 @@ export function demoApi(): Api & { signInAs(email: string): void; demoAccounts()
       throwVeloDemo.set(personId, mph);
       const d = load(); const p = d.people.find(x => x.id === personId); if (p) { p.throw_velo = mph; save(d); }
     },
+    async throwLogs({ personId, from, to }) {
+      const m = new Map<string, ThrowLog>();
+      for (const l of throwLogsDemo) if ((!personId || l.person_id === personId) && l.day >= from && l.day <= to) m.set(`${l.person_id}|${l.day}`, l);
+      return [...m.values()].sort((a, b) => b.day.localeCompare(a.day));
+    },
+    async logThrow(row) { const l: ThrowLog = { ...row, id: uid(), created_at: now() }; throwLogsDemo.push(l); return l; },
     async myThrowing(personId, from, to) {
       await this.throwAssignments();
       const pid = throwAssignDemo.get(personId);

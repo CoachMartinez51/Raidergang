@@ -9,7 +9,7 @@ import { ErrorMsg, RpeBadge, RpePicker, TopBar } from '../ui/common';
 import { GoodsCard, goodsDayFor } from '../ui/Goods';
 import { LiftToday } from './Lift';
 import { ThrowingTab, useThrowToday } from './Throwing';
-import { KINDS as THROW_KINDS, PLYO_LABEL } from '../lib/throwing';
+import { dayChip, PLYO_LABEL } from '../lib/throwing';
 import { MyVideos } from '../ui/Videos';
 import { Medalists, SprintCard } from '../ui/Sprints';
 import { ReminderCard } from '../ui/Reminders';
@@ -133,7 +133,7 @@ function Agenda({ me, go }: { me: Person; go: (t: Tab) => void }) {
     else if (!td || td.kind === 'Off') steps.push({ title: 'Catch Play', sub: td && /holiday|thanksgiving|christmas|new year/i.test(td.title + ' ' + (td.note ?? '')) ? 'Holiday · no throwing' : 'Off today · full rest', status: 'Off', dim: true, tab: 'throwing' });
     else steps.push({
       title: 'Catch Play', sub: [td.sp_title && td.sp_title !== td.title ? 'Live outing' : td.title, PLYO_LABEL[td.plyos]].join(' · '),
-      status: THROW_KINDS[td.kind].label, tab: 'throwing',
+      status: throwToday.log?.done ? 'Done' : dayChip(td), done: !!throwToday.log?.done, tab: 'throwing',
     });
   }
   if (sprint) steps.push({

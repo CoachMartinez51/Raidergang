@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../lib/api';
 import { addDays, isoDay, prettyDay } from '../lib/dates';
-import { CALC_ROWS, intensityText, KINDS, mondayOf, mphText, PLYO_LABEL, shortTitle, type ThrowDay, type ThrowProgram } from '../lib/throwing';
+import { CALC_ROWS, dayChip, dayCls, INTENSITY_FROM, intensityText, KINDS, mondayOf, mphText, PLYO_LABEL, shortTitle, showIntensity, type ThrowDay, type ThrowLog, type ThrowProgram } from '../lib/throwing';
 import type { Person } from '../lib/types';
 
 const WD = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -18,11 +18,11 @@ const shiftMonth = (iso: string, n: number) => {
 /** Today's throwing day for the athlete (used by the agenda and Pre-Throw). undefined = loading, null = nothing. */
 export function useThrowToday(personId: string) {
   const today = isoDay();
-  const [state, setState] = useState<{ program: ThrowProgram | null; day: ThrowDay | null } | undefined>(undefined);
+  const [state, setState] = useState<{ program: ThrowProgram | null; day: ThrowDay | null; log: ThrowLog | null } | undefined>(undefined);
   useEffect(() => {
-    api.myThrowing(personId, today, today)
-      .then(r => setState({ program: r.program, day: r.days[0] ?? null }))
-      .catch(() => setState({ program: null, day: null }));
+    Promise.all([api.myThrowing(personId, today, today), api.throwLogs({ personId, from: today, to: today }).catch(() => [] as ThrowLog[])])
+      .then(([r, logs]) => setState({ program: r.program, day: r.days[0] ?? null, log: logs[0] ?? null }))
+      .catch(() => setState({ program: null, day: null, log: null }));
   }, [personId, today]);
   return state;
 }
@@ -61,6 +61,7 @@ export function ThrowingTab({ me, goPreThrow }: { me: Person; goPreThrow: () => 
       <div className="row"><span className="small muted">Winter Arm Build-Up</span><span className="pill-soft gold">{program.name}</span></div>
       <DayHero d={d} date={sel} today={today} />
       {d && d.kind !== 'Off' && d.kind !== 'Recovery' && <DayDetail d={d} velo={velo} goPreThrow={goPreThrow} />}
+      {d && d.kind !== 'Off' && sel <= today && <ThrowLogCard me={me} d={d} />}
 
       <div className="card" style={{ gap: 10 }}>
         <div className="row"><h2>This week</h2>{sel !== today && <button className="link-btn" onClick={() => setSel(today)}>Back to today</button>}</div>
@@ -68,23 +69,23 @@ export function ThrowingTab({ me, goPreThrow }: { me: Person; goPreThrow: () => 
           {week.map((iso, i) => {
             const x = days.get(iso);
             return (
-              <button key={iso} className={`throw-wd ${x ? KINDS[x.kind].cls : 'k-none'} ${iso === sel ? 'sel' : ''}`} onClick={() => setSel(iso)}
+              <button key={iso} className={`throw-wd ${x ? dayCls(x) : 'k-none'} ${iso === sel ? 'sel' : ''}`} onClick={() => setSel(iso)}
                 aria-label={`${WD[i]} ${prettyDay(iso)}: ${x ? x.title : 'nothing planned'}`}>
                 <span className="wd">{WD[i]}</span><span className="dn">{Number(iso.slice(8))}</span><span className="lab">{x ? shortTitle(x) : '–'}</span>
               </button>
             );
           })}
         </div>
-        <Legend />
+        <Legend intensity={showIntensity(week[0]) || showIntensity(week[6])} />
       </div>
 
-      <div className="card" style={{ gap: 4 }}>
+      {today >= INTENSITY_FROM && <div className="card" style={{ gap: 4 }}>
         <div className="row"><h2>What is MY intensity?</h2><span className="small muted">{velo ? `Avg fastball ${velo} mph` : ''}</span></div>
         {velo ? CALC_ROWS.map(r => (
           <div key={r.label} className="kv"><span>{r.label} · {intensityText(r.kind)}</span><b>{mphText(r.kind, velo)}</b></div>
         )) : <div className="small muted">Your fall average fastball isn't in yet. Coach will add it, then your mph ranges show here.</div>}
         {velo && <div className="small muted" style={{ marginTop: 6 }}>Based on your average fastball from the fall (Trackman).</div>}
-      </div>
+      </div>}
 
       <MonthCard month={month} days={days} sel={sel} today={today} onPick={setSel}
         onPrev={() => setMonth(m => shiftMonth(m, -1))} onNext={() => setMonth(m => shiftMonth(m, 1))} />
@@ -96,8 +97,8 @@ function DayHero({ d, date, today }: { d: ThrowDay | null; date: string; today: 
   const when = `${date === today ? 'TODAY · ' : ''}${prettyDay(date, { weekday: 'short', month: 'short', day: 'numeric' }).toUpperCase()}`;
   if (!d) return <div className="throw-hero k-none"><div className="eyebrow">{when}</div><div className="t">Nothing planned</div></div>;
   return (
-    <div className={`throw-hero ${KINDS[d.kind].cls}`}>
-      <div className="row"><span className="eyebrow">{when}</span><span className={`kchip ${KINDS[d.kind].cls}`}>{KINDS[d.kind].label}</span></div>
+    <div className={`throw-hero ${dayCls(d)}`}>
+      <div className="row"><span className="eyebrow">{when}</span><span className={`kchip ${dayCls(d)}`}>{dayChip(d)}</span></div>
       <div className="t">{d.sp_title && d.sp_title !== d.title ? 'Live outing' : d.title}</div>
       {d.sp_title && d.sp_title !== d.title && (
         <div className="roles"><div><b>Relievers:</b> {d.title.replace(/^RP:\s*/i, '')}</div><div><b>Starters:</b> {d.sp_title.replace(/^SP:\s*/i, '')}</div></div>
@@ -108,8 +109,8 @@ function DayHero({ d, date, today }: { d: ThrowDay | null; date: string; today: 
 }
 
 function DayDetail({ d, velo, goPreThrow }: { d: ThrowDay; velo: number | null; goPreThrow: () => void }) {
-  const it = intensityText(d.kind);
-  const mph = mphText(d.kind, velo);
+  const it = showIntensity(d.day) ? intensityText(d.kind) : null;
+  const mph = showIntensity(d.day) ? mphText(d.kind, velo) : null;
   return (
     <div className="card" style={{ gap: 0 }}>
       <h2 style={{ marginBottom: 4 }}>Your throw</h2>
@@ -121,10 +122,13 @@ function DayDetail({ d, velo, goPreThrow }: { d: ThrowDay; velo: number | null; 
   );
 }
 
-function Legend() {
+function Legend({ intensity }: { intensity: boolean }) {
+  if (!intensity) return (
+    <div className="chips" style={{ gap: 6 }}><span className="kchip k-throw">Throw</span><span className="kchip k-off">Off</span></div>
+  );
   return (
     <div className="chips" style={{ gap: 6 }}>
-      {(['Off', 'Low', 'Medium', 'High', 'Bullpen', 'Live'] as const).map(k => <span key={k} className={`kchip ${KINDS[k].cls}`}>{KINDS[k].label}</span>)}
+      {(['Off', 'Low', 'Medium', 'High'] as const).map(k => <span key={k} className={`kchip ${KINDS[k].cls}`}>{KINDS[k].label}</span>)}
     </div>
   );
 }
@@ -151,13 +155,70 @@ function MonthCard({ month, days, sel, today, onPick, onPrev, onNext }: {
           if (!iso) return <span key={i} />;
           const x = days.get(iso);
           return (
-            <button key={iso} className={`md ${x ? KINDS[x.kind].cls : 'k-none'} ${iso === sel ? 'sel' : ''} ${iso === today ? 'today' : ''}`}
+            <button key={iso} className={`md ${x ? dayCls(x) : 'k-none'} ${iso === sel ? 'sel' : ''} ${iso === today ? 'today' : ''}`}
               aria-label={`${prettyDay(iso)}: ${x ? x.title : 'nothing planned'}`} onClick={() => { onPick(iso); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>
               {Number(iso.slice(8))}
             </button>
           );
         })}
       </div>
+    </div>
+  );
+}
+
+/** Check off the throw and say how it felt. Saved for the coaches. */
+function ThrowLogCard({ me, d }: { me: Person; d: ThrowDay }) {
+  const [log, setLog] = useState<ThrowLog | null | undefined>(undefined);
+  const [done, setDone] = useState(false);
+  const [feel, setFeel] = useState('');
+  const [editing, setEditing] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  useEffect(() => {
+    setLog(undefined); setEditing(false); setErr(null);
+    api.throwLogs({ personId: me.id, from: d.day, to: d.day }).then(r => {
+      const l = r[0] ?? null; setLog(l); setDone(l?.done ?? false); setFeel(l?.feel ?? '');
+    }).catch(() => setLog(null));
+  }, [me.id, d.day]);
+  if (log === undefined) return null;
+
+  const submit = async () => {
+    if (!done && !feel.trim()) { setErr('Check the box or add a note first.'); return; }
+    setBusy(true); setErr(null);
+    try {
+      const saved = await api.logThrow({ person_id: me.id, day: d.day, program_id: d.program_id, title: d.title, done, feel: feel.trim() || null });
+      setLog(saved); setEditing(false);
+    } catch (e) { setErr((e as Error).message); }
+    setBusy(false);
+  };
+
+  if (log && !editing) return (
+    <div className="card throw-log saved" style={{ gap: 8 }}>
+      <div className="row">
+        <h2>{log.done ? 'Throw done' : 'Throw logged'}</h2>
+        {log.done ? <span className="pill-green">✓ Done</span> : <span className="pill-soft">Not done</span>}
+      </div>
+      {log.feel ? <div className="feel">"{log.feel}"</div> : <div className="small muted">No notes.</div>}
+      <button className="link-btn" style={{ alignSelf: 'flex-start', padding: 0 }} onClick={() => setEditing(true)}>Edit</button>
+    </div>
+  );
+  return (
+    <div className="card throw-log" style={{ gap: 10 }}>
+      <h2>Log your throw</h2>
+      <label className="check-row">
+        <input type="checkbox" checked={done} onChange={e => setDone(e.target.checked)} />
+        <span>{d.day === isoDay() ? "I finished today's throw" : 'I finished this throw'}</span>
+      </label>
+      <label className="field">How did it feel? <span className="muted">(optional)</span>
+        <textarea className="input" rows={3} maxLength={1000} value={feel} onChange={e => setFeel(e.target.value)}
+          placeholder="Arm felt loose, a little tight in the forearm early, ball was coming out good at the end…" />
+      </label>
+      {err && <div className="small" style={{ color: '#FF9C9C' }}>{err}</div>}
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button className="btn" disabled={busy} onClick={submit}>{busy ? 'Saving…' : 'Submit'}</button>
+        {log && <button className="btn ghost" onClick={() => setEditing(false)}>Cancel</button>}
+      </div>
+      <span className="small muted">Your coaches see this. Late is fine: pick the day on the calendar below.</span>
     </div>
   );
 }
