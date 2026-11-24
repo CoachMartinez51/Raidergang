@@ -23,10 +23,10 @@ export function ClearGoods({ onDone }: { onDone: () => void }) {
   useEffect(() => {
     api.listPeople().then(ps => {
       setPeople(ps);
-      setWho(ps.filter(p => p.active && !p.is_coach && p.is_pitcher).map(p => p.id));
+      setWho(ps.filter(p => p.active && !p.is_coach && p.is_pitcher && !p.is_individual_pro).map(p => p.id));
     }).catch(e => setError(e.message));
   }, []);
-  const pitchers = useMemo(() => people.filter(p => p.active && !p.is_coach && p.is_pitcher)
+  const pitchers = useMemo(() => people.filter(p => p.active && !p.is_coach && p.is_pitcher && !p.is_individual_pro)
     .sort((a, b) => a.last_name.localeCompare(b.last_name)), [people]);
   const allStaff = who.length === pitchers.length && pitchers.length > 0;
   const allSections = sections.length === SECTIONS.length;

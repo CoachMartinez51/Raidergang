@@ -120,6 +120,7 @@ function Blocks({ me, data, blocks, assignments, onChanged }: {
   const [busy, setBusy] = useState(false);
   const [printing, setPrinting] = useState(false);
   const athletes = data.people.filter(p => p.active && !p.is_coach);
+  const team = athletes.filter(p => !p.is_individual_pro);
   const inGroup = (gid: string) => data.members.filter(m => m.group_id === gid).map(m => m.person_id);
   const pick = (ids: string[]) => setSel(s => { const all = ids.every(i => s.includes(i)); return all ? s.filter(x => !ids.includes(x)) : [...new Set([...s, ...ids])]; });
   const assigned = useMemo(() => block ? assignments.filter(a => a.block_id === block.id) : [], [assignments, block]);
@@ -194,9 +195,9 @@ function Blocks({ me, data, blocks, assignments, onChanged }: {
               <input className="input" type="date" value={start} onChange={e => setStart(e.target.value)} />
             </label>
             <div className="chips">
-              <button className="toggle" onClick={() => pick(athletes.map(p => p.id))}>Everyone</button>
-              <button className="toggle" onClick={() => pick(athletes.filter(p => p.is_pitcher).map(p => p.id))}>Pitchers</button>
-              <button className="toggle" onClick={() => pick(athletes.filter(p => p.is_position_player).map(p => p.id))}>Position players</button>
+              <button className="toggle" onClick={() => pick(team.map(p => p.id))}>Everyone</button>
+              <button className="toggle" onClick={() => pick(team.filter(p => p.is_pitcher).map(p => p.id))}>Pitchers</button>
+              <button className="toggle" onClick={() => pick(team.filter(p => p.is_position_player).map(p => p.id))}>Position players</button>
               {data.groups.map(g => <button key={g.id} className="toggle" onClick={() => pick(inGroup(g.id))}>{g.name}</button>)}
               <button className="toggle" onClick={() => setSel([])}>Clear</button>
             </div>

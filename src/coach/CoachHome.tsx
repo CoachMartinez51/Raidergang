@@ -160,7 +160,8 @@ function Roster({ me, data, onOpen, onAdd }: { me: Person; data: RosterData; onO
     .filter(p => showInactive || p.active)
     .filter(p => !term || [fullName(p), p.email, ...p.aliases].some(s => s.toLowerCase().includes(term)));
   const coaches = list.filter(p => p.is_coach);
-  const athletes = list.filter(p => !p.is_coach);
+  const pros = list.filter(p => !p.is_coach && p.is_individual_pro);
+  const athletes = list.filter(p => !p.is_coach && !p.is_individual_pro);
   const groupNames = (id: string) => data.members.filter(m => m.person_id === id).map(m => data.groups.find(g => g.id === m.group_id)?.name).filter(Boolean).join(', ');
 
   const section = (title: string, rows: Person[]) => (
@@ -196,6 +197,7 @@ function Roster({ me, data, onOpen, onAdd }: { me: Person; data: RosterData; onO
       </div>
       {section('Athletes', athletes)}
       {section('Coaches', coaches)}
+      {section('Individuals / Professional', pros)}
     </>
   );
 }

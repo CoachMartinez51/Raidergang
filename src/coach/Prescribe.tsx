@@ -55,7 +55,7 @@ export function Prescribe({ item, isDrill }: { item: Exercise | Drill; isDrill: 
     <div className="card" style={{ gap: 10 }}>
       <h2>Prescribe to The Goods</h2>
       <div className="chips">
-        <button className="toggle" onClick={() => setWho(athletes.filter(p => p.is_pitcher).map(p => p.id))}>All pitchers</button>
+        <button className="toggle" onClick={() => setWho(athletes.filter(p => p.is_pitcher && !p.is_individual_pro).map(p => p.id))}>All pitchers</button>
         <button className="toggle" onClick={() => setWho([])}>Clear</button>
       </div>
       <MultiSelect label="Players" options={options} value={who} onChange={setWho} placeholder="Pick players" searchable />
