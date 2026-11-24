@@ -10,19 +10,7 @@
  * Nothing in a player's own logged weights is touched — only the hidden Database tab.
  */
 const RG_POSITION_WORKBOOKS = [
-  ['Kraus',        '1d7B4SIhh72OcSrPT_CcdAvYq7IqXQcqsTVY1SfbDd88', 'Database'],
-  ['Warner',       '1D5qvpEg5ttQS314PCGJDLNMgUD1-Wtc3pAjcHb3omOY', 'Database'],
-  ['Blomquist',    '1XpoGkU2y_ddto4HGytwPIDBvd-UExcIQApe54FymSoc', 'Database'],
-  ['McClure',      '1qR209WaJprI4sJ199Jue5NP-RVtZNlK9qpcXjLkKiKI', 'Database'],
-  ['Cam Gilkerson','1argo0kr0AjsbeMMb5oQYcJbvvkwXVSFFCBScF9iEFmI', 'Database'],
-  ['Falkenstein',  '1hcq4VPwIvVUzc2Yq7TzcPyfQd0wC34M0Yn0ELPeRqaE', 'Database'],
-  ['McCann',       '1d8aaiHHQDC9qgIIJJMO17WIz2nECX0zDzA8nLRKDJw8', 'Database'],
-  ['Wood',         '1DwpEygj7H-7-TG7T1Sk75GOGW32j3iM7fcNfSta9cjw', 'Database'],
-  ['Galuski',      '1cIQm4VKJu8yAzHV5cf2ot_eTAC_OjpODs4dInwlqCI0', 'Database'],
-  ['Martin',       '1v1VyMhRS15YGpSJ231xo1Ngak7q5M_A9VKPqDAAaBHE', 'Database'],
-  ['Nelson',       '1XRletQIL11-tiQuTuFPGzvv-uQ3MmSzkL4bIGc3Op5w', 'Database'],
-  ['Cassell',      '1S92VSbW8tSDLhLXurggP61H-xsIzKYt9QozVmKGWoew', 'Database'],
-  ['Mullinax',     '1RMt8n36aEkWpxhdc_aCQfDvxdb5bvT1Eis3eIipIxyA', 'Lift Database'],
+  // ['Player', 'workbook ID from its link', 'Database'],   (filled-in copy is kept out of this repo)
 ];
 
 function raidergangPositionSetUp() {
