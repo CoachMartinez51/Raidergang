@@ -69,20 +69,33 @@ function save(d: Db) { try { localStorage.setItem(KEY, JSON.stringify(d)); } cat
 const listeners = new Set<() => void>();
 const emit = () => listeners.forEach(l => l());
 
+/** Demo library lives in memory too: browser storage can be too small for it, which would re-number it on every load. */
+let libCache: Pick<Db, 'categories' | 'exercises' | 'drills'> | null = null;
+let libLoading: Promise<void> | null = null;
 async function withLibrary(): Promise<Db> {
+  if (!libCache) libLoading ??= buildLibrary();
+  await libLoading;
   const d = load();
-  if (!d.exercises) {
-    const lib = (await import('./demoLibrary.json')).default as {
-      categories: Category[];
-      exercises: Omit<Exercise, 'id' | 'old_names' | 'active'>[];
-      drills: Omit<Drill, 'id' | 'old_names' | 'active'>[];
-    };
-    d.categories = lib.categories;
-    d.exercises = lib.exercises.map(e => ({ ...e, id: uid(), old_names: [], active: true }));
-    d.drills = lib.drills.map(x => ({ ...x, id: uid(), old_names: [], active: true }));
-    save(d);
-  }
+  d.categories = libCache!.categories; d.exercises = libCache!.exercises; d.drills = libCache!.drills;
   return d;
+}
+async function buildLibrary(): Promise<void> {
+  const d = load();
+  {
+    if (d.exercises && d.drills && d.categories) libCache = { categories: d.categories, exercises: d.exercises, drills: d.drills };
+    else {
+      const lib = (await import('./demoLibrary.json')).default as {
+        categories: Category[];
+        exercises: Omit<Exercise, 'id' | 'old_names' | 'active'>[];
+        drills: Omit<Drill, 'id' | 'old_names' | 'active'>[];
+      };
+      libCache = {
+        categories: lib.categories,
+        exercises: lib.exercises.map(e => ({ ...e, id: uid(), old_names: [], active: true })),
+        drills: lib.drills.map(x => ({ ...x, id: uid(), old_names: [], active: true })),
+      };
+    }
+  }
 }
 
 export function demoApi(): Api & { signInAs(email: string): void; demoAccounts(): Person[]; reset(): void } {
@@ -225,6 +238,7 @@ export function demoApi(): Api & { signInAs(email: string): void; demoAccounts()
       save(d); return row;
     },
     async lastLibrarySync() { return null; },
+    async prescribeGoods(rows) { return rows.length; },
     async listVideos(personId) {
       const p = personId ? load().people.find(x => x.id === personId) : null;
       if (personId && !p?.is_pitcher) return [];

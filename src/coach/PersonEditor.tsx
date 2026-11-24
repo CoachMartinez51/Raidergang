@@ -84,7 +84,7 @@ export function PersonEditor({ me, person, data, onClose, onSaved }: {
   const ro = !canEdit;
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.6)', zIndex: 50, display: 'flex', justifyContent: 'flex-end' }} onClick={onClose}>
-      <div style={{ width: '100%', maxWidth: 520, height: '100%', overflowY: 'auto', background: 'var(--bg)', borderLeft: '1px solid var(--line)', padding: 'calc(env(safe-area-inset-top) + 16px) 16px calc(env(safe-area-inset-bottom) + 40px)', display: 'flex', flexDirection: 'column', gap: 14 }}
+      <div className="drawer" style={{ width: '100%', maxWidth: 520, height: '100%', overflowY: 'auto', background: 'var(--bg)', borderLeft: '1px solid var(--line)', padding: 'calc(env(safe-area-inset-top) + 16px) 16px calc(env(safe-area-inset-bottom) + 40px)', display: 'flex', flexDirection: 'column', gap: 14 }}
         onClick={e => e.stopPropagation()}>
         <div className="row">
           <h2 style={{ margin: 0, fontFamily: "'Space Grotesk', Inter, sans-serif" }}>{isNew ? 'Add person' : fullName(person!)}</h2>

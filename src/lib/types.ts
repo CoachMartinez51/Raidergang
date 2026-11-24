@@ -74,12 +74,36 @@ export interface Exercise {
   body_area: string | null;
   video_url: string | null;
   also_fits: string | null;
+  /** Extra "Category > Subcategory" places picked in the app (the sheet sync never touches these) */
+  extra_fits?: string[];
   old_names: string[];
   active: boolean;
 }
 export type ExerciseDraft = Omit<Exercise, 'id'>;
 
 export const DRILL_TYPES = ['Stationary', 'Dynamic', 'Finisher', 'Athletic'] as const;
+export const DRILL_FOCUS = [
+  'Direction', 'Back Leg', 'Front Leg', 'Arm Action', 'Athleticism', 'Drift', 'Relaxation / Early Extension', 'Front Side',
+] as const;
+
+/** Everywhere an exercise fits: the sheet's "Also Fits" (split on ;) plus the app's extra picks. */
+export const fitsOf = (e: Pick<Exercise, 'also_fits' | 'extra_fits'>) => [...new Set([
+  ...(e.also_fits ?? '').split(';').map(s => s.trim()).filter(s => s.includes('>')).map(s => s.replace(/\s*>\s*/, ' > ')),
+  ...(e.extra_fits ?? []),
+])];
+
+export interface NewGoodsItem {
+  person_id: string;
+  day: 'A' | 'B' | 'any';
+  section: GoodsSection;
+  exercise_id: string | null;
+  drill_id: string | null;
+  dose: string | null;
+  balls: string | null;
+  note: string | null;
+  sort_order: number;
+}
+
 export interface Drill {
   id: string;
   name: string;
@@ -88,6 +112,8 @@ export interface Drill {
   ball_type: string | null;
   video_url: string | null;
   also_fits: string | null;
+  /** What the drill targets: coaches only */
+  focus?: string[];
   old_names: string[];
   active: boolean;
 }

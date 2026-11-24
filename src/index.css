@@ -243,3 +243,17 @@ select.input option { background: var(--card); }
   .plan-row > :nth-child(6) { grid-column: 2 / -2; }
   .plan-row-labels { display: none; }
 }
+
+/* ---- multi-select + library tags ---- */
+.multi-trigger { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 48px; height: auto; padding: 6px 10px; text-align: left; cursor: pointer; }
+.multi-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.multi-chip { font-size: 13px; font-weight: 600; padding: 3px 9px; border-radius: 999px; background: var(--gold-soft); color: var(--text); border: 1px solid #5A4A1C; }
+.multi-chip.locked { background: var(--green-soft); border-color: #1D5A3B; }
+.multi-panel { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; padding: 10px 12px; border: 1px solid var(--line2); border-radius: 12px; background: var(--bg); max-height: 360px; overflow-y: auto; }
+.multi-group { font-size: 12px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--green-text); padding: 8px 0 2px; }
+.multi-option { display: flex; align-items: center; gap: 10px; min-height: 40px; font-size: 15px; }
+.multi-option input { width: 20px; height: 20px; accent-color: var(--gold); flex-shrink: 0; }
+.tag-row { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.focus-tag { font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 999px; background: var(--line); color: var(--muted); }
+
+.drawer > * { flex-shrink: 0; }

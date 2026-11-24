@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../lib/api';
-import { DRILL_TYPES, type LibrarySync, type Category, type Drill, type DrillDraft, type Exercise, type ExerciseDraft, type Person } from '../lib/types';
+import { DRILL_FOCUS, DRILL_TYPES, fitsOf, type LibrarySync, type Category, type Drill, type DrillDraft, type Exercise, type ExerciseDraft, type Person } from '../lib/types';
 import { ErrorMsg } from '../ui/common';
+import { MultiSelect } from '../ui/MultiSelect';
+import { Prescribe } from './Prescribe';
 
 type Kind = 'exercises' | 'drills';
 
@@ -15,6 +17,7 @@ export function Library({ me }: { me: Person }) {
   const [drills, setDrills] = useState<Drill[] | null>(null);
   const [q, setQ] = useState('');
   const [cat, setCat] = useState<string>('all');
+  const [focus, setFocus] = useState<string>('all');
   const [showInactive, setShowInactive] = useState(false);
   const [editing, setEditing] = useState<Exercise | Drill | 'new' | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -31,21 +34,25 @@ export function Library({ me }: { me: Person }) {
   const groupedExercises = useMemo(() => {
     const rows = (exercises ?? [])
       .filter(e => showInactive || e.active)
-      .filter(e => cat === 'all' || e.category === cat)
-      .filter(e => match(term, e.name, e.category, e.subcategory, e.also_fits, e.old_names));
+      .filter(e => match(term, e.name, e.category, e.subcategory, e.also_fits, e.old_names, e.extra_fits));
+    // each exercise shows under its own spot and every spot it also fits
     const groups = new Map<string, Exercise[]>();
     for (const e of rows) {
-      const k = `${e.category}|${e.subcategory ?? ''}`;
-      groups.set(k, [...(groups.get(k) ?? []), e]);
+      const homes = [`${e.category}|${e.subcategory ?? ''}`, ...fitsOf(e).map(f => f.replace(' > ', '|'))];
+      for (const k of new Set(homes)) {
+        if (cat !== 'all' && k.split('|')[0] !== cat) continue;
+        groups.set(k, [...(groups.get(k) ?? []), e]);
+      }
     }
     return [...groups.entries()].sort((a, b) => (subOrder.get(a[0]) ?? 999) - (subOrder.get(b[0]) ?? 999));
   }, [exercises, cat, term, showInactive, subOrder]);
 
   const groupedDrills = useMemo(() => {
     const rows = (drills ?? []).filter(d => showInactive || d.active).filter(d => cat === 'all' || d.drill_type === cat)
-      .filter(d => match(term, d.name, d.drill_type, d.ball_type, d.also_fits, d.old_names));
+      .filter(d => focus === 'all' || (d.focus ?? []).includes(focus))
+      .filter(d => match(term, d.name, d.drill_type, d.ball_type, d.also_fits, d.old_names, d.focus));
     return DRILL_TYPES.map(t => [t, rows.filter(d => d.drill_type === t)] as const).filter(([, r]) => r.length);
-  }, [drills, cat, term, showInactive]);
+  }, [drills, cat, focus, term, showInactive]);
 
   const total = kind === 'exercises' ? groupedExercises.reduce((n, [, r]) => n + r.length, 0) : groupedDrills.reduce((n, [, r]) => n + r.length, 0);
   const chips = kind === 'exercises' ? categoryNames : [...DRILL_TYPES];
@@ -67,6 +74,13 @@ export function Library({ me }: { me: Person }) {
         <button className={`toggle ${cat === 'all' ? 'on' : ''}`} onClick={() => setCat('all')}>All</button>
         {chips.map(c => <button key={c} className={`toggle ${cat === c ? 'on' : ''}`} onClick={() => setCat(c)}>{c}</button>)}
       </div>
+      {kind === 'drills' && (
+        <div className="chips">
+          <span className="small muted" style={{ alignSelf: 'center' }}>Targets:</span>
+          <button className={`toggle ${focus === 'all' ? 'on' : ''}`} onClick={() => setFocus('all')}>Any</button>
+          {DRILL_FOCUS.map(f => <button key={f} className={`toggle ${focus === f ? 'on' : ''}`} onClick={() => setFocus(f)}>{f}</button>)}
+        </div>
+      )}
       <SyncStatus />
       <ErrorMsg error={error} />
       <span className="small muted">{total} shown</span>
@@ -74,7 +88,7 @@ export function Library({ me }: { me: Person }) {
       {kind === 'exercises'
         ? groupedExercises.map(([k, rows]) => {
             const [c, s] = k.split('|');
-            return <Group key={k} title={s || c} sub={s ? c : ''} rows={rows} onOpen={setEditing} />;
+            return <Group key={k} title={s || c} sub={s ? c : ''} rows={rows} onOpen={setEditing} home={k} />;
           })
         : groupedDrills.map(([t, rows]) => <Group key={t} title={t} sub="" rows={rows as Drill[]} onOpen={setEditing} />)}
 
@@ -87,7 +101,7 @@ export function Library({ me }: { me: Person }) {
   );
 }
 
-function Group<T extends Exercise | Drill>({ title, sub, rows, onOpen }: { title: string; sub: string; rows: T[]; onOpen: (x: T) => void }) {
+function Group<T extends Exercise | Drill>({ title, sub, rows, onOpen, home }: { title: string; sub: string; rows: T[]; onOpen: (x: T) => void; home?: string }) {
   return (
     <>
       <div className="section-title">{title} <span style={{ textTransform: 'none', letterSpacing: 0 }}>{sub && `· ${sub}`} ({rows.length})</span></div>
@@ -95,7 +109,13 @@ function Group<T extends Exercise | Drill>({ title, sub, rows, onOpen }: { title
         {rows.map(x => (
           <div key={x.id} className="row lib-row" onClick={() => onOpen(x)} style={{ opacity: x.active ? 1 : 0.5 }}>
             <div style={{ minWidth: 0 }}>
-              <div style={{ fontWeight: 600, fontSize: 14 }}>{x.name}</div>
+              <div style={{ fontWeight: 600, fontSize: 14 }}>
+                {x.name}
+                {home && 'category' in x && `${x.category}|${x.subcategory ?? ''}` !== home && <span className="pill-green" style={{ marginLeft: 8 }}>Also fits</span>}
+              </div>
+              {'focus' in x && (x.focus ?? []).length > 0 && (
+                <div className="tag-row">{x.focus!.map(f => <span key={f} className="focus-tag">{f}</span>)}</div>
+              )}
               {(x.also_fits || ('ball_type' in x && x.ball_type)) && (
                 <div className="small muted">{'ball_type' in x && x.ball_type ? `${x.reps ?? ''} · ${x.ball_type}` : ''}{x.also_fits ? `${'ball_type' in x ? ' · ' : ''}Also: ${x.also_fits}` : ''}</div>
               )}
@@ -113,7 +133,7 @@ function Group<T extends Exercise | Drill>({ title, sub, rows, onOpen }: { title
 function Drawer({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.6)', zIndex: 50, display: 'flex', justifyContent: 'flex-end' }} onClick={onClose}>
-      <div style={{ width: '100%', maxWidth: 520, height: '100%', overflowY: 'auto', background: 'var(--bg)', borderLeft: '1px solid var(--line)', padding: 'calc(env(safe-area-inset-top) + 16px) 16px calc(env(safe-area-inset-bottom) + 40px)', display: 'flex', flexDirection: 'column', gap: 14 }}
+      <div className="drawer" style={{ width: '100%', maxWidth: 520, height: '100%', overflowY: 'auto', background: 'var(--bg)', borderLeft: '1px solid var(--line)', padding: 'calc(env(safe-area-inset-top) + 16px) 16px calc(env(safe-area-inset-bottom) + 40px)', display: 'flex', flexDirection: 'column', gap: 14 }}
         onClick={e => e.stopPropagation()}>
         <div className="row">
           <h2 style={{ margin: 0, fontFamily: "'Space Grotesk', Inter, sans-serif" }}>{title}</h2>
@@ -130,7 +150,7 @@ const isUrl = (s: string) => !s.trim() || /^https?:\/\/\S+$/i.test(s.trim());
 function ExerciseEditor({ me, cats, item, onClose, onSaved }: { me: Person; cats: Category[]; item: Exercise | null; onClose: () => void; onSaved: () => void }) {
   const ro = !me.coach_can_edit;
   const [d, setD] = useState<ExerciseDraft>(() => item ? { ...item } : {
-    name: '', category: cats[0]?.category ?? '', subcategory: cats[0]?.subcategory ?? null, body_area: null, video_url: '', also_fits: null, old_names: [], active: true,
+    name: '', category: cats[0]?.category ?? '', subcategory: cats[0]?.subcategory ?? null, body_area: null, video_url: '', also_fits: null, extra_fits: [], old_names: [], active: true,
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -172,7 +192,12 @@ function ExerciseEditor({ me, cats, item, onClose, onSaved }: { me: Person; cats
         </label>
         {d.video_url && isUrl(d.video_url) && <a className="small" href={d.video_url} target="_blank" rel="noreferrer">Open video ↗</a>}
         <label className="field">Body area (optional)<input className="input" disabled={ro} value={d.body_area ?? ''} onChange={e => set('body_area', e.target.value)} /></label>
-        <label className="field">Also fits (optional)<input className="input" disabled={ro} placeholder="e.g. Core accessory on lower and upper days" value={d.also_fits ?? ''} onChange={e => set('also_fits', e.target.value)} /></label>
+        <MultiSelect label="Also fits (tick every place it belongs)" disabled={ro} searchable
+          options={cats.filter(c => `${c.category}|${c.subcategory}` !== `${d.category}|${d.subcategory}`).map(c => ({ value: `${c.category} > ${c.subcategory}`, label: c.subcategory, group: c.category }))}
+          locked={fitsOf({ also_fits: d.also_fits, extra_fits: [] })} lockedNote="from the Coaching Database"
+          value={(d.extra_fits ?? []).filter(v => !fitsOf({ also_fits: d.also_fits, extra_fits: [] }).includes(v))}
+          onChange={v => set('extra_fits', v)} chipText={v => v.replace(/\s*>\s*/, ' › ')} />
+        {d.also_fits && !d.also_fits.includes('>') && <span className="small muted">Sheet note: {d.also_fits}</span>}
         {d.old_names.length > 0 && <div className="small muted">Old names: {d.old_names.join(', ')}</div>}
       </div>
       {item && !ro && (
@@ -186,6 +211,7 @@ function ExerciseEditor({ me, cats, item, onClose, onSaved }: { me: Person; cats
       <ErrorMsg error={error} />
       {!ro && <button className="btn" disabled={!valid || busy} onClick={save}>{busy ? 'Saving…' : item ? 'Save changes' : 'Add to library'}</button>}
       {!ro && item && d.name.trim() !== item.name && <span className="small muted">Renaming keeps every past workout linked. The old name is saved for search.</span>}
+      {!ro && item && item.active && <Prescribe item={item} isDrill={false} />}
     </Drawer>
   );
 }
@@ -193,7 +219,7 @@ function ExerciseEditor({ me, cats, item, onClose, onSaved }: { me: Person; cats
 function DrillEditor({ me, item, onClose, onSaved }: { me: Person; item: Drill | null; onClose: () => void; onSaved: () => void }) {
   const ro = !me.coach_can_edit;
   const [d, setD] = useState<DrillDraft>(() => item ? { ...item } : {
-    name: '', drill_type: 'Stationary', reps: '1-2 x 5-8', ball_type: '', video_url: '', also_fits: null, old_names: [], active: true,
+    name: '', drill_type: 'Stationary', reps: '1-2 x 5-8', ball_type: '', video_url: '', also_fits: null, focus: [], old_names: [], active: true,
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -228,6 +254,8 @@ function DrillEditor({ me, item, onClose, onSaved }: { me: Person; item: Drill |
           <input className="input" disabled={ro} inputMode="url" autoCapitalize="none" value={d.video_url ?? ''} onChange={e => set('video_url', e.target.value)} />
         </label>
         {d.video_url && isUrl(d.video_url) && <a className="small" href={d.video_url} target="_blank" rel="noreferrer">Open video ↗</a>}
+        <MultiSelect label="What it targets (coaches only)" disabled={ro} options={DRILL_FOCUS.map(f => ({ value: f }))}
+          value={d.focus ?? []} onChange={v => set('focus', v)} placeholder="Pick what this drill works on" />
         <label className="field">Also fits (optional)<input className="input" disabled={ro} value={d.also_fits ?? ''} onChange={e => set('also_fits', e.target.value)} /></label>
       </div>
       {item && !ro && (
@@ -240,6 +268,7 @@ function DrillEditor({ me, item, onClose, onSaved }: { me: Person; item: Drill |
       )}
       <ErrorMsg error={error} />
       {!ro && <button className="btn" disabled={!valid || busy} onClick={save}>{busy ? 'Saving…' : item ? 'Save changes' : 'Add to library'}</button>}
+      {!ro && item && item.active && <Prescribe item={item} isDrill />}
     </Drawer>
   );
 }

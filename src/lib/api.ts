@@ -1,5 +1,5 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import type { Category, Checkin, GoodsItem, Drill, DrillDraft, Exercise, ExerciseDraft, Goal, GoalKind, Group, LibrarySync, Membership, Person, PersonDraft, Video, VideoPatch } from './types';
+import type { Category, Checkin, GoodsItem, Drill, DrillDraft, Exercise, ExerciseDraft, Goal, GoalKind, Group, LibrarySync, Membership, NewGoodsItem, Person, PersonDraft, Video, VideoPatch } from './types';
 import { demoApi } from './demo';
 import { addDays, isoDay } from './dates';
 import type { SprintResult, SprintSession, SprintType, SpotlightRow } from './sprints';
@@ -57,6 +57,8 @@ export interface Api {
   listDrills(): Promise<Drill[]>;
   saveDrill(id: string | null, d: DrillDraft): Promise<Drill>;
   lastLibrarySync(): Promise<LibrarySync | null>;
+  /** Add Library items to players' Goods (coaches). */
+  prescribeGoods(rows: NewGoodsItem[]): Promise<number>;
 
   /** personId = one athlete; null = everything a coach can see */
   listVideos(personId: string | null): Promise<Video[]>;
@@ -251,6 +253,11 @@ function liveApi(sb: SupabaseClient): Api {
       if (r.error) throw new Error(cleanName(r.error.message));
       return r.data as Drill;
     },
+    async prescribeGoods(rows) {
+      if (!rows.length) return 0;
+      const r = must(await sb.from('goods_items').insert(rows).select('id')) as { id: string }[];
+      return r.length;
+    },
     async lastLibrarySync() {
       const rows = must(await sb.from('library_sync_log').select('*').order('ran_at', { ascending: false }).limit(1)) as LibrarySync[];
       return rows[0] ?? null;
@@ -299,7 +306,7 @@ export function setPreviewing(on: boolean) { previewing = on; }
 const WRITES = new Set<string>([
   'signOut', 'addPerson', 'updatePerson', 'createGroup', 'setGroups', 'addGoal', 'saveCheckin',
   'savePrep', 'updateBlockDay', 'updateBlockExercise', 'addBlockExercise', 'removeBlockExercise', 'assignBlock', 'endAssignment', 'setRehab', 'logSet', 'saveExercise', 'saveDrill',
-  'updateVideo', 'rematchVideos', 'logSprint', 'removeSprint',
+  'updateVideo', 'rematchVideos', 'logSprint', 'removeSprint', 'prescribeGoods',
 ]);
 const fakeSaved = (row: object) => ({
   id: `preview-${Math.random().toString(36).slice(2)}`, created_at: new Date().toISOString(),
