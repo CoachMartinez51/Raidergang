@@ -48,7 +48,7 @@ export function SprintCard({ me }: { me: Person }) {
   }, [rows]);
   const medals = useMemo(() => {
     const m = new Map<SprintType, Record<string, number>>();
-    for (const h of hist) if (h.medal) { const c = m.get(h.sprint) ?? {}; c[h.medal] = (c[h.medal] ?? 0) + 1; m.set(h.sprint, c); }
+    for (const h of hist) if (h.medal && h.final !== false) { const c = m.get(h.sprint) ?? {}; c[h.medal] = (c[h.medal] ?? 0) + 1; m.set(h.sprint, c); }
     return m;
   }, [hist]);
 
@@ -57,13 +57,14 @@ export function SprintCard({ me }: { me: Person }) {
   // how much faster than their first recorded week on each sprint
   const firstOf = new Map<SprintType, SprintSession>();
   for (const h of hist) { const f = firstOf.get(h.sprint); if (!f || h.session_date < f.session_date) firstOf.set(h.sprint, h); }
-  const myMedals = hist.filter(h => h.medal);
+  const myMedals = hist.filter(h => h.medal && h.final !== false);
   const totals = (['gold', 'silver', 'bronze'] as const).map(k => [k, myMedals.filter(h => h.medal === k).length] as const);
 
   const week = mondayOf(date);
   const thisWeek = rows.filter(r => r.sprint === sprint && !r.session_label && mondayOf(r.run_date) === week)
     .sort((a, b) => a.created_at.localeCompare(b.created_at));
-  const latest = hist[0];
+  const latest = hist.find(h => h.final !== false);
+  const liveNow = hist.find(h => h.final === false && h.medal);
   const secs = parseTime(time);
 
   const add = async () => {
@@ -90,6 +91,11 @@ export function SprintCard({ me }: { me: Person }) {
     <>
       <div className="section-title">Sprints</div>
       <div className="card" style={{ gap: 12 }}>
+        {liveNow?.medal && (
+          <div className="msg info" style={{ fontWeight: 600 }}>
+            {MEDAL_ICON[liveNow.medal]} You're in {liveNow.medal} position on the {liveNow.sprint} this week ({fmtTime(liveNow.best)}). Hold it until Sunday night.
+          </div>
+        )}
         {latest?.medal && (
           <div className="msg info" style={{ fontWeight: 600 }}>
             {MEDAL_ICON[latest.medal]} {latest.medal[0].toUpperCase() + latest.medal.slice(1)} on the {latest.sprint} · {latest.session} ({fmtTime(latest.best)})
@@ -162,7 +168,7 @@ export function SprintCard({ me }: { me: Person }) {
             {shown.map(h => (
               <div key={`${h.sprint}|${h.session}`} className="row small" style={{ borderTop: '1px solid var(--line)', paddingTop: 4 }}>
                 <span><b>{h.sprint}</b> <span className="muted">· {h.session}</span></span>
-                <span>{h.medal ? `${MEDAL_ICON[h.medal]} ` : ''}{fmtTime(h.best)}</span>
+                <span>{h.medal && h.final !== false ? `${MEDAL_ICON[h.medal]} ` : ''}{fmtTime(h.best)}</span>
               </div>
             ))}
             {hist.length > 6 && <button className="link" style={{ alignSelf: 'flex-start', padding: 0 }} onClick={() => setAllHistory(a => !a)}>{allHistory ? 'Show less' : `Show all ${hist.length}`}</button>}
@@ -201,36 +207,54 @@ export function Medalists({ me }: { me: Person }) {
   const [rows, setRows] = useState<SpotlightRow[] | null>(null);
   useEffect(() => { api.sprintSpotlight().then(setRows).catch(() => setRows([])); }, []);
   if (!rows || !rows.length) return null;
+  const live = rows.filter(r => r.status === 'live');
+  const official = rows.filter(r => r.status === 'official');
+  return (
+    <div className="card medalists">
+      <h2>The Medalists</h2>
+      {live.length > 0 && <Board me={me} rows={live} live />}
+      {official.length > 0 && <Board me={me} rows={official} />}
+    </div>
+  );
+}
+
+function Board({ me, rows, live }: { me: Person; rows: SpotlightRow[]; live?: boolean }) {
   const { sprint, session } = rows[0];
   const pools = [
     { title: 'Pitchers', list: rows.filter(r => r.is_pitcher) },
     { title: 'Position players', list: rows.filter(r => !r.is_pitcher) },
   ].filter(p => p.list.length);
   return (
-    <div className="card medalists">
+    <div className={`board ${live ? 'live' : ''}`}>
       <div className="row">
-        <h2>The Medalists</h2>
+        <span className="board-title">{live ? <><span className="live-dot" aria-hidden="true" />This week · live</> : 'Official medals'}</span>
         <span className="small muted">{sprint} · {session}</span>
       </div>
-      {pools.map(p => (
-        <div key={p.title} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {pools.length > 1 && <span className="small muted" style={{ letterSpacing: 1, textTransform: 'uppercase' }}>{p.title}</span>}
-          {p.list.filter(r => r.medal).map(r => (
-            <div key={r.person_id} className={`medal-row ${r.medal} ${r.person_id === me.id ? 'me' : ''}`}>
-              <span style={{ fontSize: 20 }} aria-label={r.medal!}>{MEDAL_ICON[r.medal!]}</span>
-              <span style={{ flex: 1, fontWeight: 600 }}>{r.first_name} {r.last_name}{r.person_id === me.id ? ' (you)' : ''}</span>
-              <b style={{ fontVariantNumeric: 'tabular-nums' }}>{fmtTime(r.best)}</b>
-            </div>
-          ))}
-          {p.list.filter(r => r.most_improved).map(r => (
-            <div key={`mi-${r.person_id}`} className={`medal-row improved ${r.person_id === me.id ? 'me' : ''}`}>
-              <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--green-text)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M4 17l6-6 4 4 6-7" /><path d="M14 8h6v6" /></svg>
-              <span style={{ flex: 1 }}><b>Most Improved</b> · {r.first_name} {r.last_name}{r.person_id === me.id ? ' (you)' : ''}</span>
-              <span className="small" style={{ fontVariantNumeric: 'tabular-nums' }}>{fmtTime(r.prev_best!)} → <b>{fmtTime(r.best)}</b></span>
-            </div>
-          ))}
-        </div>
-      ))}
+      {live && <span className="small muted">Log a faster time to knock someone off. Final at midnight Sunday.</span>}
+      {pools.map(p => {
+        const top = p.list.filter(r => r.rk <= 3).sort((a, b) => a.rk - b.rk || a.last_name.localeCompare(b.last_name));
+        const short = top.length > 0 && top[0].runners < 4;
+        return (
+          <div key={p.title} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {pools.length > 1 && <span className="small muted" style={{ letterSpacing: 1, textTransform: 'uppercase' }}>{p.title}</span>}
+            {top.map(r => (
+              <div key={r.person_id} className={`medal-row ${r.medal ?? ''} ${r.person_id === me.id ? 'me' : ''}`}>
+                <span style={{ fontSize: 20, width: 26, textAlign: 'center' }} aria-label={r.medal ?? `Place ${r.rk}`}>{r.medal ? MEDAL_ICON[r.medal] : <b className="muted">{r.rk}</b>}</span>
+                <span style={{ flex: 1, fontWeight: 600 }}>{r.first_name} {r.last_name}{r.person_id === me.id ? ' (you)' : ''}</span>
+                <b style={{ fontVariantNumeric: 'tabular-nums' }}>{fmtTime(r.best)}</b>
+              </div>
+            ))}
+            {short && <span className="small muted">{top[0].runners} logged so far. Medals need at least 4 times.</span>}
+            {p.list.filter(r => r.most_improved).map(r => (
+              <div key={`mi-${r.person_id}`} className={`medal-row improved ${r.person_id === me.id ? 'me' : ''}`}>
+                <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--green-text)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M4 17l6-6 4 4 6-7" /><path d="M14 8h6v6" /></svg>
+                <span style={{ flex: 1 }}><b>Most Improved</b> · {r.first_name} {r.last_name}{r.person_id === me.id ? ' (you)' : ''}</span>
+                <span className="small" style={{ fontVariantNumeric: 'tabular-nums' }}>{fmtTime(r.prev_best!)} → <b>{fmtTime(r.best)}</b></span>
+              </div>
+            ))}
+          </div>
+        );
+      })}
     </div>
   );
 }

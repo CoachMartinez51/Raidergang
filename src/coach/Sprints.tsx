@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api } from '../lib/api';
 import { addDays, isoDay } from '../lib/dates';
-import { MEDAL_ICON, SPRINTS, fmtTime, mondayOf, sessionName, type SprintResult, type SprintSession, type SprintType } from '../lib/sprints';
+import { MEDAL_ICON, SPRINTS, fmtTime, mondayOf, type SprintResult, type SprintSession, type SprintType } from '../lib/sprints';
 import { fullName, type Person } from '../lib/types';
 import { ErrorMsg } from '../ui/common';
 import { parseTime } from '../ui/Sprints';
@@ -40,11 +40,13 @@ export function Sprints({ me, data }: { me: Person; data: RosterData }) {
   })();
   const medalCount = (pid: string) => {
     const c: Record<string, number> = {};
-    for (const s of board) if (s.person_id === pid && s.sprint === sprint && s.medal) c[s.medal] = (c[s.medal] ?? 0) + 1;
+    for (const s of board) if (s.person_id === pid && s.sprint === sprint && s.medal && s.final !== false) c[s.medal] = (c[s.medal] ?? 0) + 1;
     return (['gold', 'silver', 'bronze'] as const).filter(k => c[k]).map(k => `${MEDAL_ICON[k]}${c[k] > 1 ? `×${c[k]}` : ''}`).join(' ');
   };
 
-  const entriesFor = (pid: string) => raw.filter(r => r.person_id === pid && r.sprint === sprint && sessionName(r) === current)
+  const currentWeek = weekRows[0]?.session_date ?? '';
+  const isLive = weekRows.some(r => r.final === false);
+  const entriesFor = (pid: string) => raw.filter(r => r.person_id === pid && r.sprint === sprint && mondayOf(r.run_date) === currentWeek)
     .sort((a, b) => Number(a.seconds) - Number(b.seconds));
 
   const remove = async (id: string) => {
@@ -109,6 +111,7 @@ export function Sprints({ me, data }: { me: Person; data: RosterData }) {
           {sessions.map(s => <option key={s} value={s}>{s}</option>)}
         </select>
       )}
+      {view === 'week' && isLive && <div className="msg info small"><b>Live week.</b> Standings move as times come in; medals become official at midnight Sunday.</div>}
       <div className="small muted">Medals go to the 3 fastest times each week (ties share). Pitchers and position players are ranked separately; a week needs 4+ runners.{view === 'week' ? ' Tap a name to see every rep.' : ''}</div>
       {table(rows.filter(r => r.is_pitcher), 'Pitchers', view === 'week')}
       {table(rows.filter(r => !r.is_pitcher), 'Position players', view === 'week')}

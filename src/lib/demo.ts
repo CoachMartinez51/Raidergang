@@ -366,6 +366,11 @@ function demoSprints(people: Person[]): SprintResult[] {
     id: uid(), person_id: p.id, sprint: s, run_date: addDays('2026-09-07', (w - 1) * 7), session_label: `Fall Wk ${w}`,
     seconds: Math.round((base[s] + ((i * 7 + w * 3) % 9) / 100) * 100) / 100, source: 'sheet', retired_at: null, created_at: now(),
   })));
+  // this week's 10/10s so far (the live board)
+  runners.slice(1).forEach((p, i) => out.push({
+    id: uid(), person_id: p.id, sprint: '10/10', run_date: isoDay(), session_label: null,
+    seconds: 1.10 + i * 0.03, source: 'app', retired_at: null, created_at: now(),
+  }));
   return out;
 }
 
