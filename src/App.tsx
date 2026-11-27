@@ -69,7 +69,6 @@ const GREETINGS = [
 const PHOTOS: [string, string][] = [
   ['dogpile-1.jpg', '50% 40%'],
   ['dogpile-2.jpg', '30% 40%'],
-  ['home-run.jpg', '50% 40%'],
 ];
 let photoPick = -1;
 /** Picks a new photo (never the same one twice in a row). */
