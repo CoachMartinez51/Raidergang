@@ -64,19 +64,48 @@ const GREETINGS = [
   'Ba Boom Mr. {last}!',
 ];
 
+/** Loading-screen photos (public/loading), cropped for a phone. One is picked at random each time the app opens.
+ *  [file, object-position] — the position keeps the action in frame on wider screens. */
+const PHOTOS: [string, string][] = [
+  ['dogpile-1.jpg', '50% 40%'],
+  ['dogpile-2.jpg', '30% 40%'],
+  ['fired-up.jpg', '50% 35%'],
+  ['dugout.jpg', '50% 40%'],
+  ['home-run.jpg', '50% 40%'],
+  ['tattoo.jpg', '50% 40%'],
+];
+let photoPick = -1;
+/** Picks a new photo (never the same one twice in a row). */
+function newPhoto() {
+  let i = Math.floor(Math.random() * PHOTOS.length);
+  if (i === photoPick) i = (i + 1) % PHOTOS.length;
+  photoPick = i;
+}
+newPhoto();
+// start downloading this open's photo right away
+try { const img = new Image(); img.src = `/loading/${PHOTOS[photoPick][0]}`; } catch { /* ignore */ }
+
+let linePick: string | null = null;
 function Greeting({ name, last }: { name: string | null; last: string | null }) {
   const [line] = useState(() => {
     const options = GREETINGS.filter(g => (name || !g.includes('{name}')) && (last || !g.includes('{last}')));
-    return options[Math.floor(Math.random() * options.length)];
+    // keep the same line when the screen re-renders after sign-in finishes
+    if (!linePick || !options.includes(linePick)) linePick = options[Math.floor(Math.random() * options.length)];
+    return linePick;
   });
+  const [file, pos] = PHOTOS[photoPick];
   const parts = line.split(/(\{name\}|\{last\})/);
   return (
-    <div className="center greet">
-      <img src="/raidergang-logo.png" alt="Raidergang · Wright State Baseball" style={{ width: 240, maxWidth: '75%' }} />
-      <div style={{ fontFamily: "'Space Grotesk', Inter, sans-serif", fontSize: 24, fontWeight: 700, lineHeight: 1.3, textAlign: 'center', padding: '0 20px' }}>
+    <div className="splash">
+      <img className="splash-photo" src={`/loading/${file}`} alt="" style={{ objectPosition: pos }} />
+      <div className="splash-shade" />
+      <div className="splash-mid">
+        <img className="splash-logo" src="/raidergang-logo.png" alt="Raidergang · Wright State Baseball" />
+        <div className="splash-line">
         {parts.map((p, i) => p === '{name}' || p === '{last}'
           ? <span key={i} style={{ color: 'var(--gold)' }}>{p === '{name}' ? name : last}</span>
           : <span key={i}>{p}</span>)}
+        </div>
       </div>
     </div>
   );
@@ -105,6 +134,8 @@ export default function App() {
   }, [refresh]);
 
   const freshStart = useCallback(() => {
+    newPhoto();
+    linePick = null;
     setGreeting(true);
     setVisit(v => v + 1);
     window.scrollTo(0, 0);
@@ -115,7 +146,7 @@ export default function App() {
   // keep the greeting up for a moment once we know who it is
   useEffect(() => {
     if (state.kind !== 'in' || !greeting) return;
-    const t = setTimeout(() => setGreeting(false), 1800);
+    const t = setTimeout(() => setGreeting(false), 2600);
     return () => clearTimeout(t);
   }, [state.kind, greeting]);
 
