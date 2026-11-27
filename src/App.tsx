@@ -83,6 +83,21 @@ function Greeting({ name, last }: { name: string | null; last: string | null }) 
     if (!linePick || !options.includes(linePick)) linePick = options[Math.floor(Math.random() * options.length)];
     return linePick;
   });
+  // Paint the whole phone screen (status bar, Safari's bars, the edges behind the notch and home bar)
+  // in the backdrop color while the loading screen is up, then put the app's normal color back.
+  const color = BACKDROPS[backdropPick];
+  useEffect(() => {
+    const meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+    const before = meta?.content;
+    document.documentElement.style.background = color;
+    document.body.style.background = color;
+    meta?.setAttribute('content', color);
+    return () => {
+      document.documentElement.style.background = '';
+      document.body.style.background = '';
+      if (meta && before) meta.setAttribute('content', before);
+    };
+  }, [color]);
   const parts = line.split(/(\{name\}|\{last\})/);
   return (
     <div className="splash" style={{ background: BACKDROPS[backdropPick] }}>
