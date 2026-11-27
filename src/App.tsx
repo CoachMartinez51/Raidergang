@@ -64,22 +64,16 @@ const GREETINGS = [
   'Ba Boom Mr. {last}!',
 ];
 
-/** Loading-screen photos (public/loading), cropped for a phone. One is picked at random each time the app opens.
- *  [file, object-position] — the position keeps the action in frame on wider screens. */
-const PHOTOS: [string, string][] = [
-  ['dogpile-1.jpg', '50% 40%'],
-  ['dogpile-2.jpg', '30% 40%'],
-];
-let photoPick = -1;
-/** Picks a new photo (never the same one twice in a row). */
-function newPhoto() {
-  let i = Math.floor(Math.random() * PHOTOS.length);
-  if (i === photoPick) i = (i + 1) % PHOTOS.length;
-  photoPick = i;
+/** Loading-screen backdrop: black or dark green, picked at random each time the app opens.
+ *  (Team photos are parked for now — see git history for the dogpile version.) */
+const BACKDROPS = ['#000000', '#0B2A1C'];
+let backdropPick = -1;
+function newBackdrop() {
+  let i = Math.floor(Math.random() * BACKDROPS.length);
+  if (i === backdropPick) i = (i + 1) % BACKDROPS.length;
+  backdropPick = i;
 }
-newPhoto();
-// start downloading this open's photo right away
-try { const img = new Image(); img.src = `/loading/${PHOTOS[photoPick][0]}`; } catch { /* ignore */ }
+newBackdrop();
 
 let linePick: string | null = null;
 function Greeting({ name, last }: { name: string | null; last: string | null }) {
@@ -89,12 +83,10 @@ function Greeting({ name, last }: { name: string | null; last: string | null }) 
     if (!linePick || !options.includes(linePick)) linePick = options[Math.floor(Math.random() * options.length)];
     return linePick;
   });
-  const [file, pos] = PHOTOS[photoPick];
   const parts = line.split(/(\{name\}|\{last\})/);
   return (
-    <div className="splash">
-      <img className="splash-photo" src={`/loading/${file}`} alt="" style={{ objectPosition: pos }} />
-      <div className="splash-shade" />
+    <div className="splash" style={{ background: BACKDROPS[backdropPick] }}>
+      <div className="splash-fade" />
       <div className="splash-mid">
         <img className="splash-logo" src="/raidergang-logo.png" alt="Raidergang · Wright State Baseball" />
         <div className="splash-line">
@@ -130,7 +122,7 @@ export default function App() {
   }, [refresh]);
 
   const freshStart = useCallback(() => {
-    newPhoto();
+    newBackdrop();
     linePick = null;
     setGreeting(true);
     setVisit(v => v + 1);
