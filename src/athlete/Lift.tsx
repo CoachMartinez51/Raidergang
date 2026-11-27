@@ -18,7 +18,9 @@ interface Loaded {
   logs: SetLog[];          // last ~60 days, newest value per set
 }
 
-const canLogOn = (date: string) => date >= addDays(isoDay(), -3) && date <= addDays(isoDay(), 1);
+/** Athletes can log (or fix) any lift from the last 14 days. */
+const LOG_BACK_DAYS = 14;
+const canLogOn = (date: string) => date >= addDays(isoDay(), -LOG_BACK_DAYS) && date <= addDays(isoDay(), 1);
 
 /** The lift part of the athlete's Today screen: Lift Prep, sprints, and The Meatshack. */
 export function LiftToday({ me }: { me: Person }) {
@@ -106,7 +108,7 @@ function MeatshackCard({ me, day, week, date, data, onLogged }: {
         </div>
         <span className="small muted">{day.label} · {prettyDay(date)}</span>
         {day.notes && <div className="coach-note">{day.notes}</div>}
-        {!loggable && <div className="small muted">Logging opens on {prettyDay(date)}.</div>}
+        {!loggable && <div className="small muted">{date > isoDay() ? `Logging opens on ${prettyDay(date)}.` : `Too far back to log. Lifts from the last ${LOG_BACK_DAYS} days can be filled in.`}</div>}
       </div>
 
       <div className="lift-block">
