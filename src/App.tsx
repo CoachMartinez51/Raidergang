@@ -64,9 +64,9 @@ const GREETINGS = [
   'Ba Boom Mr. {last}!',
 ];
 
-/** Loading-screen backdrop: black or dark green, picked at random each time the app opens.
+/** Loading-screen backdrop: full black. (Add colors here to rotate at random, e.g. dark green '#0B2A1C'.)
  *  (Team photos are parked for now — see git history for the dogpile version.) */
-const BACKDROPS = ['#000000', '#0B2A1C'];
+const BACKDROPS = ['#000000'];
 let backdropPick = -1;
 function newBackdrop() {
   let i = Math.floor(Math.random() * BACKDROPS.length);
