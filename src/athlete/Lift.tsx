@@ -18,8 +18,8 @@ interface Loaded {
   logs: SetLog[];          // last ~60 days, newest value per set
 }
 
-/** Athletes can log (or fix) any lift from the last 14 days. */
-const LOG_BACK_DAYS = 14;
+/** Athletes can log (or fix) any lift from the last 7 days. */
+const LOG_BACK_DAYS = 7;
 const canLogOn = (date: string) => date >= addDays(isoDay(), -LOG_BACK_DAYS) && date <= addDays(isoDay(), 1);
 
 /** The lift part of the athlete's Today screen: Lift Prep, sprints, and The Meatshack. */
